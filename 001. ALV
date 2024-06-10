@@ -1,0 +1,517 @@
+*&---------------------------------------------------------------------*
+*& Report ZREPORT_ALV_1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zreport_alv_1.
+
+TABLES: mkpf,  "Documento do Material
+        mseg,  "Segmento de Documento - Material
+        makt,  "Textos Breves de Material
+        t001w, "Centros/Filiais
+        t001l. "Depósitos
+
+"-----------------------------------------------------------------------"
+
+TYPES: BEGIN OF ty_mkpf,        "Estrutura de Documento do Material
+         mblnr TYPE mkpf-mblnr, "Número do documento do material
+         mjahr TYPE mkpf-mjahr, "Ano do documento do material
+         bldat TYPE mkpf-bldat, "Data no documento
+       END OF ty_mkpf.
+
+DATA: t_mkpf TYPE STANDARD TABLE OF ty_mkpf WITH HEADER LINE,
+      ls_mkpf LIKE LINE OF t_mkpf.
+
+"------------------------------------------------
+
+TYPES: BEGIN OF ty_mseg,
+          mblnr TYPE mseg-mblnr, "Número do documento do material
+          mjahr TYPE mseg-mjahr, "Ano do documento do material
+          zeile TYPE mseg-zeile, "Item no documento do material
+          bwart TYPE mseg-bwart, "Tipo de movimento (administração de estoques)
+          matnr TYPE mseg-matnr, "Nº do material
+          werks TYPE mseg-werks, "Centro
+          lgort TYPE mseg-lgort, "Depósito
+          dmbtr TYPE mseg-dmbtr, "Montante em moeda interna
+          menge TYPE mseg-menge, "Quantidade
+          meins TYPE mseg-meins, "Unidade de medida básica
+END OF ty_mseg.
+
+DATA: t_mseg TYPE TABLE OF ty_mseg WITH HEADER LINE,
+      ls_mseg TYPE ty_mseg.
+
+"------------------------------------------------
+
+TYPES: BEGIN OF ty_makt,
+  matnr TYPE makt-matnr, "Nº do material
+  maktx TYPE makt-maktx, "Texto breve de material
+  END OF ty_makt.
+
+DATA: t_makt TYPE STANDARD TABLE OF makt WITH HEADER LINE,
+      ls_makt LIKE LINE OF t_makt.
+
+"------------------------------------------------
+
+TYPES: BEGIN OF ty_t001w,
+  werks TYPE t001w-werks, "Centro
+  name1 TYPE t001w-name1, "Nome
+END OF ty_t001w.
+
+DATA: t_t001w TYPE STANDARD TABLE OF t001w WITH HEADER LINE,
+      ls_t001w LIKE LINE OF t_t001w.
+
+"------------------------------------------------
+
+TYPES: BEGIN OF ty_t001l,
+  werks TYPE t001l-werks, "Centro
+  lgort TYPE t001l-lgort, "Depósito
+  lgobe TYPE t001l-lgobe, "Descrição do depósito
+  END OF ty_t001l.
+
+DATA: t_t001l TYPE STANDARD TABLE OF t001l WITH HEADER LINE,
+      ls_t001l LIKE LINE OF t_t001l.
+
+"------------------------------------------------
+
+TYPES: BEGIN OF ty_output,
+         mblnr          TYPE mkpf-mblnr,
+         mjahr          TYPE mkpf-mjahr,
+         bldat          TYPE mkpf-bldat,
+         zeile          TYPE mseg-zeile,
+         bwart          TYPE mseg-bwart,
+         matnr          TYPE mseg-matnr,
+         maktx          TYPE makt-maktx,
+         werks          TYPE mseg-werks,
+         name1          TYPE t001w-name1,
+         lgort          TYPE mseg-lgort,
+         lgobe          TYPE t001l-lgobe,
+         meins          TYPE mseg-meins,
+         dmbtr          TYPE mseg-dmbtr,
+         menge          TYPE mseg-menge,
+         unit_val       TYPE p DECIMALS 2,
+       END OF ty_output.
+
+DATA: t_output TYPE TABLE OF ty_output WITH HEADER LINE,
+      ls_output TYPE ty_output.
+
+"------------------------------------------------
+
+DATA: alv_object       TYPE REF TO cl_salv_table,
+      alv_functions    TYPE REF TO cl_salv_functions_list,
+      alv_columns      TYPE REF TO cl_salv_columns_table,
+      alv_sorts        TYPE REF TO cl_salv_sorts,
+      alv_aggregations TYPE REF TO cl_salv_aggregations,
+      it_fieldcat      TYPE slis_t_fieldcat_alv,
+      wa_fieldcat      TYPE slis_fieldcat_alv.
+
+"------------------------------------------------
+
+"Título do ALV
+
+DATA: lv_datenow    TYPE char10,
+      lv_hour       TYPE sy-uzeit,
+      lv_hour_str   TYPE string,
+      lv_minute_str TYPE string,
+      lv_second_str TYPE string,
+      lv_title      TYPE string,
+      lv_supertitle TYPE char70.
+
+DATA: lv_time_str TYPE string.
+
+lv_title = 'Relatório de Movimentação de Material'.
+lv_hour = sy-uzeit.
+
+" Separação da hora, minuto e segundo
+lv_hour_str   = lv_hour+0(2).
+lv_minute_str = lv_hour+2(2).
+lv_second_str = lv_hour+4(2).
+
+" Concatenando-os com ":" para formar o horário completo
+CONCATENATE lv_hour_str ':' lv_minute_str ':' lv_second_str INTO lv_time_str.
+
+CALL FUNCTION 'CONVERT_DATE_TO_EXTERNAL'
+  EXPORTING
+    date_internal = sy-datum
+  IMPORTING
+    date_external = lv_datenow.
+
+CONCATENATE lv_title lv_datenow lv_time_str INTO lv_supertitle SEPARATED BY ' / '.
+
+"------------------------------------------------
+
+* Definir parâmetros de entrada
+PARAMETERS: p_mjahr TYPE mkpf-mjahr DEFAULT '2008'.
+
+* Definir seleção de múltiplos valores para MBLNR e BWART dentro de um bloco
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE text-001.
+
+SELECT-OPTIONS: s_mblnr FOR t_output-mblnr,
+                s_bwart FOR t_output-bwart.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+"Processamento de Sub-Rotinas.
+START-OF-SELECTION.
+
+PERFORM get_data.
+PERFORM read_data.
+PERFORM fcat.
+PERFORM display.
+
+END-OF-SELECTION.
+
+*&---------------------------------------------------------------------*
+*& Form GET_DATA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_data .
+
+  "-------------------------------------------------------------------------------------------------------
+
+  "Seleciona os campos MBLNR, MJAHR e BLDAT da tabela MKPF
+  "com base nos critérios fornecidos e armazena os registros na tabela interna T_MKPF.
+  SELECT mblnr,
+         mjahr,
+         bldat
+    FROM mkpf
+    INTO CORRESPONDING FIELDS OF TABLE @t_mkpf
+    WHERE mblnr IN @s_mblnr
+      AND mjahr = @p_mjahr
+      AND blart = 'WL'.
+
+  "------------------------------------------------
+
+  "seleciona os campos especificados da tabela MSEG
+  "relacionados à tabela interna T_MKPF e armazena os registros na tabela interna T_MSEG.
+  SELECT mblnr,
+         mjahr,
+         zeile,
+         bwart,
+         matnr,
+         werks,
+         lgort,
+         dmbtr,
+         menge,
+         meins
+    FROM mseg
+    INTO CORRESPONDING FIELDS OF TABLE @t_mseg
+    FOR ALL ENTRIES IN @t_mkpf
+    WHERE mblnr = @t_mkpf-mblnr
+      AND mjahr = @t_mkpf-mjahr
+      AND bwart IN @s_bwart.
+
+  "------------------------------------------------
+
+  "Seleciona os campos especificados da tabela MAKT
+  "relacionados à tabela interna T_MSEG e armazena os registros na tabela interna T_MAKT.
+    SELECT matnr,
+           maktx
+      FROM makt
+      INTO CORRESPONDING FIELDS OF TABLE @t_makt
+      FOR ALL ENTRIES IN @t_mseg
+      WHERE matnr = @t_mseg-matnr
+        AND spras = @sy-langu.
+
+  "------------------------------------------------
+
+  "Seleciona os campos especificados da tabela T001W
+  "relacionados à tabela interna T_MSEG e armazena os registros na tabela interna T_T001W.
+    SELECT werks,
+           name1
+      FROM t001w
+      INTO CORRESPONDING FIELDS OF TABLE @t_t001w
+      FOR ALL ENTRIES IN @t_mseg
+      WHERE werks = @t_mseg-werks.
+
+  "------------------------------------------------
+
+  "Seleciona os campos especificados da tabela T001L
+  "relacionados à tabela interna T_MSEG e armazena os registros na tabela interna T_T001L.
+    SELECT werks,
+           lgort,
+           lgobe
+      FROM t001l
+      INTO CORRESPONDING FIELDS OF TABLE @t_t001l
+      FOR ALL ENTRIES IN @t_mseg
+      WHERE werks = @t_mseg-werks
+      AND lgort = @t_mseg-lgort.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form read_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM read_data .
+
+*   Processamento
+  LOOP AT t_mseg INTO ls_mseg.
+
+    CLEAR: ls_output.
+
+    ls_output-mblnr = ls_mseg-mblnr.
+    ls_output-mjahr = ls_mseg-mjahr.
+    ls_output-zeile = ls_mseg-zeile.
+    ls_output-bwart = ls_mseg-bwart.
+    ls_output-matnr = ls_mseg-matnr.
+    ls_output-werks = ls_mseg-werks.
+    ls_output-lgort = ls_mseg-lgort.
+    ls_output-dmbtr = ls_mseg-dmbtr.
+    ls_output-menge = ls_mseg-menge.
+    ls_output-meins = ls_mseg-meins.
+
+    READ TABLE t_mkpf INTO ls_mkpf WITH KEY mblnr = ls_mseg-mblnr mjahr = ls_mseg-mjahr.
+    IF sy-subrc = 0.
+      ls_output-bldat = ls_mkpf-bldat.
+    ENDIF.
+
+    READ TABLE t_makt INTO ls_makt WITH KEY matnr = ls_mseg-matnr.
+    IF sy-subrc = 0.
+      ls_output-maktx = ls_makt-maktx.
+    ENDIF.
+
+    READ TABLE t_t001w INTO ls_t001w WITH KEY werks = ls_mseg-werks.
+    IF sy-subrc = 0.
+      ls_output-name1 = ls_t001w-name1.
+    ENDIF.
+
+    READ TABLE t_t001l INTO ls_t001l WITH KEY werks = ls_mseg-werks lgort = ls_mseg-lgort.
+    IF sy-subrc = 0.
+      ls_output-lgobe = ls_t001l-lgobe.
+    ENDIF.
+
+    IF ls_mseg-menge NE 0.
+      ls_output-unit_val = ls_mseg-dmbtr / ls_mseg-menge.
+    ENDIF.
+
+    APPEND ls_output TO t_output.
+
+    " Quebra de Linhas por BWART e BLDAT
+    SORT t_output BY bwart bldat.
+
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form fcat
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fcat .
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 1.
+  wa_fieldcat-fieldname = 'mblnr'.
+  wa_fieldcat-key = 'X'.
+  wa_fieldcat-hotspot = 'X'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Número do Documento'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 19. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 2.
+  wa_fieldcat-fieldname = 'mjahr'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Ano'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 4. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 3.
+  wa_fieldcat-fieldname = 'bldat'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Data No Documento'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 17. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 4.
+  wa_fieldcat-fieldname = 'zeile'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Item'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 4. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 5.
+  wa_fieldcat-fieldname = 'bwart'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Documento Seguimento'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 20. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 6.
+  wa_fieldcat-fieldname = 'matnr'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Número do Material'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 18. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 7.
+  wa_fieldcat-fieldname = 'maktx'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Texto Breve de Material'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 23. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 8.
+  wa_fieldcat-fieldname = 'werks'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Centro'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 6. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 9.
+  wa_fieldcat-fieldname = 'name1'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Nome'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 30. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 10.
+  wa_fieldcat-fieldname = 'lgort'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Depósito'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 8. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 11.
+  wa_fieldcat-fieldname = 'lgobe'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Descrição do Depósito'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 16. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 12.
+  wa_fieldcat-fieldname = 'meins'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Unidade de Medida'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 17. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 13.
+  wa_fieldcat-fieldname = 'dmbtr'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Valor Monetário Interno'.
+  wa_fieldcat-do_sum = 'X'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 23. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 14.
+  wa_fieldcat-fieldname = 'menge'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Quantidade'.
+  wa_fieldcat-do_sum = 'X'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 10. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 15.
+  wa_fieldcat-fieldname = 'unit_val'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Valor Unitário'.
+  wa_fieldcat-do_sum = 'X'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 14. " Define a largura da coluna
+  APPEND wa_fieldcat TO it_fieldcat.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form display
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM display .
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+     EXPORTING
+*     I_INTERFACE_CHECK                 = ' '
+*     I_BYPASSING_BUFFER                = ' '
+*     I_BUFFER_ACTIVE                   = ' '
+      i_callback_program                = 'SY-REPID'
+*     I_CALLBACK_PF_STATUS_SET          = ' '
+*     I_CALLBACK_USER_COMMAND           = ' '
+*     I_CALLBACK_TOP_OF_PAGE            = ' '
+*     I_CALLBACK_HTML_TOP_OF_PAGE       = ' '
+*     I_CALLBACK_HTML_END_OF_LIST       = ' '
+*     I_STRUCTURE_NAME                  =
+*     I_BACKGROUND_ID                   = ' '
+      i_grid_title                      = lv_supertitle
+*     I_GRID_SETTINGS                   =
+*     IS_LAYOUT                         =
+      it_fieldcat                       = it_fieldcat
+*     IT_EXCLUDING                      =
+*     IT_SPECIAL_GROUPS                 =
+*     IT_SORT                           =
+*     IT_FILTER                         =
+*     IS_SEL_HIDE                       =
+*     I_DEFAULT                         = 'X'
+*     I_SAVE                            = ' '
+*     IS_VARIANT                        =
+*     IT_EVENTS                         =
+*     IT_EVENT_EXIT                     =
+*     IS_PRINT                          =
+*     IS_REPREP_ID                      =
+*     I_SCREEN_START_COLUMN             = 0
+*     I_SCREEN_START_LINE               = 0
+*     I_SCREEN_END_COLUMN               = 0
+*     I_SCREEN_END_LINE                 = 0
+*     I_HTML_HEIGHT_TOP                 = 0
+*     I_HTML_HEIGHT_END                 = 0
+*     IT_ALV_GRAPHICS                   =
+*     IT_HYPERLINK                      =
+*     IT_ADD_FIELDCAT                   =
+*     IT_EXCEPT_QINFO                   =
+*     IR_SALV_FULLSCREEN_ADAPTER        =
+*     O_PREVIOUS_SRAL_HANDLER           =
+*   IMPORTING
+*     E_EXIT_CAUSED_BY_CALLER           =
+*     ES_EXIT_CAUSED_BY_USER            =
+    TABLES
+      t_outtab                          = t_output
+*   EXCEPTIONS
+*     PROGRAM_ERROR                     = 1
+*     OTHERS                            = 2
+            .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+ENDFORM.
