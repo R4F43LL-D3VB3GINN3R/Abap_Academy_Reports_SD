@@ -108,21 +108,22 @@ ENDFORM.
 *& <--  p2        text
 *&---------------------------------------------------------------------*
 FORM fill_data .
+  
   "Alimenta a Tabela de Saída
   LOOP AT t_vbap INTO ls_vbap.
-  READ TABLE t_vbak INTO ls_vbak WITH KEY vbeln = ls_vbap-vbeln.
-  IF sy-subrc = 0 AND ls_vbak-kunnr <> ''. " Verifica se o emissor não está vazio
-    ls_output-vbeln  = ls_vbap-vbeln.   " Copia o número do documento de vendas
-    ls_output-posnr  = ls_vbap-posnr.   " Copia o número do item do documento de vendas
-    ls_output-matnr  = ls_vbap-matnr.   " Copia o número do material
-    ls_output-kwmeng = ls_vbap-kwmeng.  " Copia a quantidade da ordem acumulada em unidade de venda
-    ls_output-netwr  = ls_vbap-netwr.   " Copia o valor líquido do item da ordem na moeda do documento
-    ls_output-erdat  = ls_vbak-erdat.   " Copia a data de criação do registro
-    ls_output-auart  = ls_vbak-auart.   " Copia o tipo de documento de vendas
-    ls_output-kunnr  = ls_vbak-kunnr.   " Copia o emissor da ordem
-    APPEND ls_output TO t_output.       " Adiciona a linha à tabela de saída
-  ENDIF.
-ENDLOOP.
+    READ TABLE t_vbak INTO ls_vbak WITH KEY vbeln = ls_vbap-vbeln.
+      IF sy-subrc = 0 AND ls_vbak-kunnr <> ''. " Verifica se o emissor não está vazio
+        ls_output-vbeln  = ls_vbap-vbeln.   " Copia o número do documento de vendas
+        ls_output-posnr  = ls_vbap-posnr.   " Copia o número do item do documento de vendas
+        ls_output-matnr  = ls_vbap-matnr.   " Copia o número do material
+        ls_output-kwmeng = ls_vbap-kwmeng.  " Copia a quantidade da ordem acumulada em unidade de venda
+        ls_output-netwr  = ls_vbap-netwr.   " Copia o valor líquido do item da ordem na moeda do documento
+        ls_output-erdat  = ls_vbak-erdat.   " Copia a data de criação do registro
+        ls_output-auart  = ls_vbak-auart.   " Copia o tipo de documento de vendas
+        ls_output-kunnr  = ls_vbak-kunnr.   " Copia o emissor da ordem
+        APPEND ls_output TO t_output.       " Adiciona a linha à tabela de saída
+      ENDIF.
+  ENDLOOP.
 
 ENDFORM.
 *&---------------------------------------------------------------------*
@@ -145,41 +146,42 @@ FORM display_data .
 *material, Quantidade da ordem acumulada em unidade de venda e Valor líquido do item
 *da ordem na moeda do documento.
 
-SORT t_output BY kunnr. "Ordena Tabela Interna por Emissor.
+  SORT t_output BY kunnr. "Ordena Tabela Interna por Emissor.
 
-DATA: lv_last_kunnr TYPE kunnr,  "Último Emissor da Ordem
-      lv_count      TYPE i.      "Contador de Ordens de Venda
+  DATA: lv_last_kunnr TYPE kunnr,  "Último Emissor da Ordem
+        lv_count      TYPE i.      "Contador de Ordens de Venda
 
-lv_last_kunnr = ''.  " Inicializa a variável do último emissor
-lv_count = 0.        " Inicializa o contador
+  lv_last_kunnr = ''.  " Inicializa a variável do último emissor
+  lv_count = 0.        " Inicializa o contador
 
-*Impressão dos Dados
-LOOP AT t_output INTO ls_output.
-  IF lv_last_kunnr <> ls_output-kunnr.
-    IF lv_last_kunnr <> ''.
-      WRITE: / '--------------------------------------------------'.
-      WRITE: / 'Emissor: ', lv_last_kunnr, 'Quantidade de Ordens: ', lv_count.
-      WRITE: / '--------------------------------------------------'.
-      lv_count = 0.
+*  Impressão dos Dados
+  LOOP AT t_output INTO ls_output.
+    IF lv_last_kunnr <> ls_output-kunnr.
+      IF lv_last_kunnr <> ''.
+        WRITE: / '--------------------------------------------------'.
+        WRITE: / 'Emissor: ', lv_last_kunnr, 'Quantidade de Ordens: ', lv_count.
+        WRITE: / '--------------------------------------------------'.
+        lv_count = 0.
+      ENDIF.
+      WRITE: / 'Emissor: ', ls_output-kunnr. "Primeira linha escrita
+      lv_last_kunnr = ls_output-kunnr.
     ENDIF.
-    WRITE: / 'Emissor: ', ls_output-kunnr. "Primeira linha escrita
-    lv_last_kunnr = ls_output-kunnr.
+
+    WRITE: / 'Documento de vendas: ', ls_output-vbeln,
+           / 'Item do documento de vendas: ', ls_output-posnr,
+           / 'Nº do material: ', ls_output-matnr,
+           / 'Quantidade da ordem acumulada em unidade de venda: ', ls_output-kwmeng,
+           / 'Valor líquido do item da ordem na moeda do documento: ', ls_output-netwr,
+           / 'Data de criação do registro: ', ls_output-erdat,
+           / 'Tipo de documento de vendas: ', ls_output-auart.
+    WRITE: / '--------------------------------------------------'.
+    lv_count = lv_count + 1.
+  ENDLOOP.
+
+  IF lv_last_kunnr <> ''.
+    WRITE: / '--------------------------------------------------'.
+    WRITE: / 'Emissor: ', lv_last_kunnr, 'Quantidade de Ordens: ', lv_count.
+    WRITE: / '--------------------------------------------------'.
   ENDIF.
 
-  WRITE: / 'Documento de vendas: ', ls_output-vbeln,
-         / 'Item do documento de vendas: ', ls_output-posnr,
-         / 'Nº do material: ', ls_output-matnr,
-         / 'Quantidade da ordem acumulada em unidade de venda: ', ls_output-kwmeng,
-         / 'Valor líquido do item da ordem na moeda do documento: ', ls_output-netwr,
-         / 'Data de criação do registro: ', ls_output-erdat,
-         / 'Tipo de documento de vendas: ', ls_output-auart.
-  WRITE: / '--------------------------------------------------'.
-  lv_count = lv_count + 1.
-ENDLOOP.
-
-IF lv_last_kunnr <> ''.
-  WRITE: / '--------------------------------------------------'.
-  WRITE: / 'Emissor: ', lv_last_kunnr, 'Quantidade de Ordens: ', lv_count.
-  WRITE: / '--------------------------------------------------'.
-ENDIF.
 ENDFORM.
