@@ -82,6 +82,14 @@ END OF ty_t001.
 DATA: t_t001  TYPE TABLE OF ty_t001, "Tabela Interna - Estrutura - Empresa
       ls_t001 TYPE ty_t001.          "Estrutura - Estrutura - Empresa
 
+SELECT bukrs,    "Selecione Empresa
+       butxt     "Denominação da Firma ou Empresa
+       FROM t001 "Da Tabela Transparente - Empresa
+       INTO CORRESPONDING FIELDS OF TABLE @t_t001 "Nos campos correspondentes da Tabela Interna - Empresa
+       FOR ALL ENTRIES IN @t_skb1 "Relacionado com a Tabela Interna - Mestre de Contas do Razão (Empresa)
+       WHERE bukrs = @t_skb1-bukrs "Onde as Empresas são as mesmas
+       AND land1 = 'BR'. "E onde o país é Brasil
+
 *Para cada registro retornado da tabela SKA1, selecionar na tabela SKAT sua
 *descrição desde que esta esteja no Código de idioma ‘PT’, Plano de Contas ‘INT’, onde
 *o campo Nº conta do Razão relaciona as duas tabelas, retornando os campos Nº conta
