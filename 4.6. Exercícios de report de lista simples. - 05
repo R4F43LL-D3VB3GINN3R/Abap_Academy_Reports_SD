@@ -1,0 +1,68 @@
+*&---------------------------------------------------------------------*
+*& Report ZREPORT_5
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zreport_5.
+
+*5 - Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
+*o Nº conta do Razão como seleção múltipla. Seu tipo se encontra na tabela SKA1.
+
+TABLES: ska1. "Tabela Transparente - Mestre de Contas do Razão
+
+"---------------
+"Tela de Seleção
+"---------------
+
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
+  SELECT-OPTIONS s_saknr FOR ska1-saknr. "Campo de Escolha Múltipla - Nº Conta do Razão
+SELECTION-SCREEN END OF BLOCK a1.
+SELECTION-SCREEN SKIP 1.
+
+INITIALIZATION.
+  " Definir intervalo padrão para o campo de escolha múltipla
+  CLEAR s_saknr.
+  s_saknr-sign = 'I'. " Inclusão
+  s_saknr-option = 'BT'. " Between (intervalo)
+  s_saknr-low = '0000001000'.
+  s_saknr-high = '0000195000'.
+  APPEND s_saknr.
+
+*Selecionar na tabela SKA1 todas as Contas do Razão que estiverem de acordo
+*com o campo Nº conta do Razão da tela de seleção e que pertençam ao Plano de
+*Contas ‘INT’, retornando os campos Nº conta do Razão e Data de criação do registro.
+
+TYPES: BEGIN OF ty_ska1, "Estrutura - Mestre de Contas do Razão
+  saknr TYPE ska1-saknr, "Nº conta do Razão
+  erdat TYPE ska1-erdat, "Data de Criação do Registro
+END OF ty_ska1.
+
+DATA: t_ska1  TYPE TABLE OF ty_ska1, "Tabela Interna - Estrutura - Mestre de Contas do Razão
+      ls_ska1 TYPE ska1.             "Estrutura - Estrutura - Mestre de Contas do Razão
+
+SELECT saknr, "Selecione Nº conta do Razão
+       erdat  "Data de Criação do Registro
+  FROM ska1   "Da Tabela Transparente - Mestre de Contas do Razão
+  INTO CORRESPONDING FIELDS OF TABLE @t_ska1 "Nos campos correspondentes da Tabela Interna - Mestre de Contas do Razão
+  WHERE saknr IN @s_saknr "Onde o Nº conta do Razão está no range do Campo de Escolha Múltipla - Nº Conta do Razão
+  AND ktopl = 'INT'. "E Plano de Contas for 'INT'
+
+*Para cada registro encontrado na tabela SKA1, selecionar na tabela SKB1 as
+*empresas correspondentes as Contas do Razão encontradas onde o campo Nº conta do
+*Razão relaciona as duas tabelas, retornando os campos Empresa e Nº conta do Razão.
+*Para cada registro encontrado na tabela SKB1, selecionar na tabela T001 os
+*dados das empresas selecionadas, onde o campo Empresa relaciona as duas tabelas e
+*o País seja igual a ‘BR’, retornando os campos Empresa e Denominação da firma ou
+*empresa.
+*Para cada registro retornado da tabela SKA1, selecionar na tabela SKAT sua
+*descrição desde que esta esteja no Código de idioma ‘PT’, Plano de Contas ‘INT’, onde
+*o campo Nº conta do Razão relaciona as duas tabelas, retornando os campos Nº conta
+*do Razão e Texto das contas do Razão.
+*O relatório deve imprimir todas as contas do razão de cada empresa selecionada
+*do País ‘BR’, bem como os dados da empresa e a descrição da conta do razão no
+*Código de idioma ‘PT’. Para cada empresa deverá mostrar um contador de contas do
+*razão e no final do relatório a quantidade de registros encontrados.
+*Imprimir os campos: Empresa, Denominação da firma ou empresa, Nº conta do
+*Razão, Data de criação do registro e Texto das contas do Razão.
+*Exemplo de Layout:
