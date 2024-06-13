@@ -59,6 +59,11 @@ TYPES: BEGIN OF ty_skb1, "Estrutura - Mestre da Conta do Razão (Empresa)
   saknr TYPE skb1-saknr, "Nº conta do Razão
 END OF ty_skb1.
 
+DATA: t_skb1  TYPE TABLE OF ty_skb1, "Tabela Interna - Esturtura - Mestre da Conta do Razão (Empresa)
+      ls_skb1 TYPE ty_skb1.         "Estrutura - Estrutura - Mestre da Conta do Razão (Empresa)
+
+
+
 *Para cada registro encontrado na tabela SKB1, selecionar na tabela T001 os
 *dados das empresas selecionadas, onde o campo Empresa relaciona as duas tabelas e
 *o País seja igual a ‘BR’, retornando os campos Empresa e Denominação da firma ou
