@@ -9,8 +9,8 @@ REPORT zreport_5.
 *o Nº conta do Razão como seleção múltipla. Seu tipo se encontra na tabela SKA1.
 
 TABLES: ska1, "Tabela Transparente - Mestre de Contas do Razão
-        skb1. "Tabela Transparente - Mestre da Conta do Razão (Empresa)
-
+        skb1, "Tabela Transparente - Mestre da Conta do Razão (Empresa)
+        t001. "Tabela Transparente - Empresas
 
 "---------------
 "Tela de Seleção
@@ -59,8 +59,8 @@ TYPES: BEGIN OF ty_skb1, "Estrutura - Mestre da Conta do Razão (Empresa)
   saknr TYPE skb1-saknr, "Nº conta do Razão
 END OF ty_skb1.
 
-DATA: t_skb1  TYPE TABLE OF ty_skb1, "Tabela Interna - Esturtura - Mestre da Conta do Razão (Empresa)
-      ls_skb1 TYPE ty_skb1.         "Estrutura - Estrutura - Mestre da Conta do Razão (Empresa)
+DATA: t_skb1  TYPE TABLE OF ty_skb1, "Tabela Interna - Estrutura - Mestre da Conta do Razão (Empresa)
+      ls_skb1 TYPE ty_skb1.          "Estrutura - Estrutura - Mestre da Conta do Razão (Empresa)
 
 SELECT bukrs,    "Seleciona Empresa
        saknr     "Nº conta do Razão
@@ -73,6 +73,15 @@ SELECT bukrs,    "Seleciona Empresa
 *dados das empresas selecionadas, onde o campo Empresa relaciona as duas tabelas e
 *o País seja igual a ‘BR’, retornando os campos Empresa e Denominação da firma ou
 *empresa.
+
+TYPES: BEGIN OF ty_t001, "Estrutura - Empresas
+  bukrs TYPE t001-bukrs, "Empresa
+  butxt TYPE t001-butxt, "Denominação da Firma ou Empresa
+END OF ty_t001.
+
+DATA: t_t001  TYPE TABLE OF ty_t001, "Tabela Interna - Estrutura - Empresa
+      ls_t001 TYPE ty_t001.          "Estrutura - Estrutura - Empresa
+
 *Para cada registro retornado da tabela SKA1, selecionar na tabela SKAT sua
 *descrição desde que esta esteja no Código de idioma ‘PT’, Plano de Contas ‘INT’, onde
 *o campo Nº conta do Razão relaciona as duas tabelas, retornando os campos Nº conta
