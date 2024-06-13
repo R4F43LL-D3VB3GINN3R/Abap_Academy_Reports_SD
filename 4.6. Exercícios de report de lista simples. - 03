@@ -144,27 +144,26 @@ ENDFORM.
 FORM fill_data .
 
   LOOP AT t_t001w INTO ls_t001w.
-  "Limpa a estrutura apenas uma vez por iteração do loop externo
-  CLEAR: ls_output.
-  ls_output-werks = ls_t001w-werks.
-  ls_output-name1 = ls_t001w-name1.
-  ls_output-land1 = ls_t001w-land1.
-  ls_output-regio = ls_t001w-regio.
+    "Limpa a estrutura apenas uma vez por iteração do loop externo
+    CLEAR: ls_output.
+    ls_output-werks = ls_t001w-werks.
+    ls_output-name1 = ls_t001w-name1.
+    ls_output-land1 = ls_t001w-land1.
+    ls_output-regio = ls_t001w-regio.
 
-  "Encontrar materiais ampliados para este centro
-  LOOP AT t_marc INTO ls_marc WHERE werks = ls_t001w-werks.
-    " Verifica se há uma entrada correspondente na tabela makt
-    READ TABLE t_makt INTO ls_makt WITH KEY matnr = ls_marc-matnr BINARY SEARCH.
-    IF sy-subrc = 0.
-      "Preencher os campos restantes
-      ls_output-matnr = ls_makt-matnr.
-      ls_output-maktx = ls_makt-maktx.
-      "Adicionar entrada à tabela de saída
-      APPEND ls_output TO t_output.
-    ENDIF.
+    "Encontrar materiais ampliados para este centro
+    LOOP AT t_marc INTO ls_marc WHERE werks = ls_t001w-werks.
+      " Verifica se há uma entrada correspondente na tabela makt
+      READ TABLE t_makt INTO ls_makt WITH KEY matnr = ls_marc-matnr BINARY SEARCH.
+        IF sy-subrc = 0.
+          "Preencher os campos restantes
+          ls_output-matnr = ls_makt-matnr.
+          ls_output-maktx = ls_makt-maktx.
+          "Adicionar entrada à tabela de saída
+          APPEND ls_output TO t_output.
+      ENDIF.
+    ENDLOOP.
   ENDLOOP.
-
-ENDLOOP.
 
 ENDFORM.
 *&---------------------------------------------------------------------*
