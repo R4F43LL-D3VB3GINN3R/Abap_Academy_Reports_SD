@@ -92,30 +92,30 @@ TYPES: BEGIN OF ty_output, "Estrutura da Tabela de Saída
   name1 TYPE t001w-name1, "Nome
   land1 TYPE t001w-land1, "País
   regio TYPE t001w-regio, "Região
-  matnr TYPE marc-matnr, "Número do Material
-  maktx TYPE makt-maktx, "Denominação
+  matnr TYPE marc-matnr,  "Número do Material
+  maktx TYPE makt-maktx,  "Denominação
 END OF ty_output.
 
 DATA: t_output TYPE TABLE OF ty_output, "Tabela Interna da Tabela de Saída
       ls_output TYPE ty_output.         "Estrutura da Tabela Interna de Saída
 
 LOOP AT t_t001w INTO ls_t001w.
-  " Limpa a estrutura apenas uma vez por iteração do loop externo
+  "Limpa a estrutura apenas uma vez por iteração do loop externo
   CLEAR: ls_output.
   ls_output-werks = ls_t001w-werks.
   ls_output-name1 = ls_t001w-name1.
   ls_output-land1 = ls_t001w-land1.
   ls_output-regio = ls_t001w-regio.
 
-  " Encontrar materiais ampliados para este centro
+  "Encontrar materiais ampliados para este centro
   LOOP AT t_marc INTO ls_marc WHERE werks = ls_t001w-werks.
     " Verifica se há uma entrada correspondente na tabela makt
     READ TABLE t_makt INTO ls_makt WITH KEY matnr = ls_marc-matnr BINARY SEARCH.
     IF sy-subrc = 0.
-      " Preencher os campos restantes
+      "Preencher os campos restantes
       ls_output-matnr = ls_makt-matnr.
       ls_output-maktx = ls_makt-maktx.
-      " Adicionar entrada à tabela de saída
+      "Adicionar entrada à tabela de saída
       APPEND ls_output TO t_output.
     ENDIF.
   ENDLOOP.
@@ -127,3 +127,40 @@ ENDLOOP.
 *de materiais encontrados para cada um dos centros selecionados.
 *Imprimir os campos Centro, Nome 1, País, Região, Nº do material e Denominação.
 *Exemplo de Layout:
+
+SORT t_output BY werks.
+
+DATA: lv_last_werks TYPE t001w-werks,
+      lv_count TYPE i.
+
+lv_last_werks = ''.
+lv_count = 0.
+data: bool type boolean.
+bool = 'false'.
+
+LOOP AT t_t001w INTO ls_t001w.
+  CLEAR: lv_count.
+      WRITE: / '-----------------------------------------------'.
+      WRITE: / 'Centro:', ls_t001w-werks,
+             / 'Nome:', ls_t001w-name1,
+             / 'País:', ls_t001w-land1,
+             / 'Região:', ls_t001w-regio.
+      WRITE: / '-----------------------------------------------'.
+
+  " Listar os materiais para este centro
+  LOOP AT t_marc INTO ls_marc WHERE werks = ls_t001w-werks.
+    " Verifica se há uma entrada correspondente na tabela makt
+    READ TABLE t_makt INTO ls_makt WITH KEY matnr = ls_marc-matnr BINARY SEARCH.
+      IF sy-subrc = 0.
+        WRITE: / 'Número do Material:', ls_marc-matnr,
+               / 'Denominação:', ls_makt-maktx, /.
+        WRITE: / '-----------------------------------------------'.
+        lv_count = lv_count + 1.
+        bool = 'true'.
+      ENDIF.
+  ENDLOOP.
+  IF lv_count > 0.
+    " Imprimir o total de materiais para este centro
+    WRITE: / 'Total de materiais para o centro', ls_t001w-werks, '=', lv_count, /.
+  ENDIF.
+ENDLOOP.
