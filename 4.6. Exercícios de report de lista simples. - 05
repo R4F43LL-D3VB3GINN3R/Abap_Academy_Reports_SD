@@ -43,12 +43,12 @@ END OF ty_ska1.
 DATA: t_ska1  TYPE TABLE OF ty_ska1, "Tabela Interna - Estrutura - Mestre de Contas do Razão
       ls_ska1 TYPE ska1.             "Estrutura - Estrutura - Mestre de Contas do Razão
 
-SELECT saknr, "Selecione Nº conta do Razão
-       erdat  "Data de Criação do Registro
-  FROM ska1   "Da Tabela Transparente - Mestre de Contas do Razão
-  INTO CORRESPONDING FIELDS OF TABLE @t_ska1 "Nos campos correspondentes da Tabela Interna - Mestre de Contas do Razão
-  WHERE saknr IN @s_saknr "Onde o Nº conta do Razão está no range do Campo de Escolha Múltipla - Nº Conta do Razão
-  AND ktopl = 'INT'. "E Plano de Contas for 'INT'
+SELECT saknr,      "Selecione Nº conta do Razão
+       erdat       "Data de Criação do Registro
+       FROM ska1   "Da Tabela Transparente - Mestre de Contas do Razão
+       INTO CORRESPONDING FIELDS OF TABLE @t_ska1 "Nos campos correspondentes da Tabela Interna - Mestre de Contas do Razão
+       WHERE saknr IN @s_saknr "Onde o Nº conta do Razão está no range do Campo de Escolha Múltipla - Nº Conta do Razão
+       AND ktopl = 'INT'. "E Plano de Contas for 'INT'
 
 *Para cada registro encontrado na tabela SKA1, selecionar na tabela SKB1 as
 *empresas correspondentes as Contas do Razão encontradas onde o campo Nº conta do
@@ -62,7 +62,12 @@ END OF ty_skb1.
 DATA: t_skb1  TYPE TABLE OF ty_skb1, "Tabela Interna - Esturtura - Mestre da Conta do Razão (Empresa)
       ls_skb1 TYPE ty_skb1.         "Estrutura - Estrutura - Mestre da Conta do Razão (Empresa)
 
-
+SELECT bukrs,    "Seleciona Empresa
+       saknr     "Nº conta do Razão
+       FROM skb1 "Da Tabela Transparente - Mestre de Contas do Razão (Empresa)
+       INTO CORRESPONDING FIELDS OF TABLE @t_skb1 "Nos campos correspondentes da Tabela Interna - Mestre de Contas do Razão (Empresa)
+       FOR ALL ENTRIES IN @t_ska1 "Relacionado com a Tabela Interna - Mestre de Contas do Razão
+       WHERE saknr = @t_ska1-saknr. "Onde os campos Nº conta do Razão são iguais.
 
 *Para cada registro encontrado na tabela SKB1, selecionar na tabela T001 os
 *dados das empresas selecionadas, onde o campo Empresa relaciona as duas tabelas e
