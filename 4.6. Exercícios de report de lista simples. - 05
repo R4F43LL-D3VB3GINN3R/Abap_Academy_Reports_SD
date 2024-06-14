@@ -127,18 +127,20 @@ DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Estrutura - Tabela de
 "Enche a Tabela de Saída
 LOOP AT t_ska1 INTO ls_ska1.
   CLEAR ls_output.
-  ls_output-saknr = ls_ska1-saknr.
-  ls_output-erdat = ls_ska1-erdat.
-  LOOP AT t_skat INTO ls_skat WHERE saknr = ls_ska1-saknr.
-    ls_output-txt20 = ls_skat-txt20.
-  ENDLOOP.
   LOOP AT t_skb1 INTO ls_skb1 WHERE saknr = ls_ska1-saknr.
+    ls_output-saknr = ls_ska1-saknr.
+    ls_output-erdat = ls_ska1-erdat.
     ls_output-bukrs = ls_skb1-bukrs.
     LOOP AT t_t001 INTO ls_t001 WHERE bukrs = ls_skb1-bukrs.
       ls_output-butxt = ls_t001-butxt.
     ENDLOOP.
   ENDLOOP.
-  APPEND ls_output TO t_output.
+  LOOP AT t_skat INTO ls_skat WHERE saknr = ls_ska1-saknr.
+    ls_output-txt20 = ls_skat-txt20.
+    IF sy-subrc = 0.
+      APPEND ls_output TO t_output.
+    ENDIF.
+  ENDLOOP.
 ENDLOOP.
 
 *O relatório deve imprimir todas as contas do razão de cada empresa selecionada
@@ -149,11 +151,18 @@ ENDLOOP.
 *Razão, Data de criação do registro e Texto das contas do Razão.
 *Exemplo de Layout:
 
-data: lv_count type i,
-      lv_last_bukrs type skb1-bukrs.
+DATA: lv_count TYPE i,
+      lv_last_bukrs TYPE skb1-bukrs.
 
-sort t_output by bukrs.
+SORT t_output BY bukrs.
 
-loop at t_output into ls_output.
-  write: / 'Empresa: ', ls_output-bukrs.
-endloop.
+LOOP AT t_output INTO ls_output.
+  WRITE: / 'Empresa:', ls_output-bukrs,
+         / 'Denominação da Firma ou Empresa:', ls_output-butxt,
+         / 'Nº conta do Razão:', ls_output-saknr,
+         / 'Data de Criação do Registro:', ls_output-erdat,
+         / 'Texto das Contas do Razão:', ls_output-txt20.
+  WRITE: / '-----------------------------------------------'.
+ENDLOOP.
+
+write 'a'.
