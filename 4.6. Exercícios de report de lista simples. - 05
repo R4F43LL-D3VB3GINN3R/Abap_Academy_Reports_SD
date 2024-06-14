@@ -5,9 +5,6 @@
 *&---------------------------------------------------------------------*
 REPORT zreport_5.
 
-*5 - Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
-*o Nº conta do Razão como seleção múltipla. Seu tipo se encontra na tabela SKA1.
-
 TABLES: ska1, "Tabela Transparente - Mestre de Contas do Razão
         skb1, "Tabela Transparente - Mestre da Conta do Razão (Empresa)
         t001, "Tabela Transparente - Empresas
@@ -75,6 +72,9 @@ lv_last_bukrs = ''.
 "---------------
 "Tela de Seleção
 "---------------
+
+*5 - Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
+*o Nº conta do Razão como seleção múltipla. Seu tipo se encontra na tabela SKA1.
 
 SELECTION-SCREEN SKIP 1.
 SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
