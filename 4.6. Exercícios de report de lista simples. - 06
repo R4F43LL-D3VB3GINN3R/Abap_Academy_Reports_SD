@@ -6,7 +6,8 @@
 REPORT zreport_6.
 
 TABLES: cepc,  "Tabela Transparente - Dados Mestres de Centros de Lucro
-        cepct. "Tabela Transparente - Textos de Dados Mestres de Centro de Lucro
+        cepct, "Tabela Transparente - Textos de Dados Mestres de Centro de Lucro
+        tka01. "Áreas de Contabilidade de Custos
 
 *6 - Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
 *o Centro de lucro como seleção múltipla e a Área de contabilidade de custos também
@@ -75,12 +76,39 @@ SELECT prctr, "Selecione Centro de Lucro
        AND spras = 'P'             "E o idioma for Português.
        AND ltext <> ''.            "Haviam algumas descrições vazias na BD, então inseri está cláusula.
 
-
-
 *Para cada registro encontrado na tabela CEPC, selecionar na tabela TKA01 as
 *descrições das Áreas de contabilidade de custos encontradas onde, o campo Área de
 *contabilidade de custos relaciona as duas tabelas. Retornar os campos Área de
 *contabilidade de custos e Denominação da área de contabilidade de custos
+
+TYPES: BEGIN OF ty_tka01, "Estrutura - Áreas de Contabilidade de Custos
+  kokrs TYPE tka01-kokrs, "Área de Contabilidade de Custos
+  bezei TYPE tka01-bezei, "Denominação da Área de Contabilidade de Custos
+END OF ty_tka01.
+
+DATA: t_tka01  TYPE TABLE OF ty_tka01, "Tabela Interna - Estrutura - Áreas de Contabilidade de Custos
+      ls_tka01 TYPE ty_tka01.          "Estrutura - Estrutura - Áreas de Contabilidade de Custos
+
+SELECT kokrs, "Selecione a Área de Contabilidade de Custos
+       bezei  "Denominação da Área de Contabilidade de Custos
+       FROM tka01 "Da Tabela Transparente - Áreas de Contabilidade de Custos
+       INTO CORRESPONDING FIELDS OF TABLE @t_tka01 "Nos campos correspondentes da Tabela Interna - Áreas de Contabilidade de Custos
+       FOR ALL ENTRIES IN @t_cepc "Relacionando com os campos da Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE kokrs = @t_cepc-kokrs. "Os a Área de Contabilidade de Custos são iguais.
+
+TYPES: BEGIN OF ty_output, "Estrutura de Saída
+  prctr TYPE cepc-prctr,   "Centro de Lucro
+  datbi TYPE cepc-datbi,   "Data de Validade Final
+  kokrs TYPE cepc-kokrs,   "Área de Contabilidade de Custos
+  datab TYPE cepc-datab,   "Data Início Validade
+  usnam TYPE cepc-usnam,   "Criado Por
+  ltext TYPE cepct-ltext,  "Texto Descritivo
+  bezei TYPE tka01-bezei,  "Denominação da Área de Contabilidade de Custos
+END OF ty_output.
+
+DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Estrutura de Saída
+      ls_output TYPE ty_output.          "Estrutura - Estrutura - Estrutura de Saída
+
 *O relatório deve imprimir todos os Centros de Lucro de cada Área de contabilidade
 *de custos selecionada. Para cada Área de contabilidade de custos deverá mostrar um
 *contador de Centros de Lucro e no final do relatório a quantidade de registros
