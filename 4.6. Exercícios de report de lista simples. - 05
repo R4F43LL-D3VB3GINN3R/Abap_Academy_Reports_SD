@@ -1,233 +1,183 @@
 *&---------------------------------------------------------------------*
-*& Report ZREPORT_5
+*& Report ZREPORT_6
 *&---------------------------------------------------------------------*
 *&
 *&---------------------------------------------------------------------*
-REPORT zreport_5.
+REPORT zreport_6.
 
-TABLES: ska1, "Tabela Transparente - Mestre de Contas do Razão
-        skb1, "Tabela Transparente - Mestre da Conta do Razão (Empresa)
-        t001, "Tabela Transparente - Empresas
-        skat. "Tabela Transparente - Mestre de Contas do Razão (Denominação)
+TABLES: cepc,  "Tabela Transparente - Dados Mestres de Centros de Lucro
+        cepct, "Tabela Transparente - Textos de Dados Mestres de Centro de Lucro
+        tka01. "Áreas de Contabilidade de Custos
 
-"-----------------------------------------------------------------------------------------"
-"-----------------------------------------------------------------------------------------"
-"-----------------------------------------------------------------------------------------"
-"Declaração de Variáveis, Estruturas e Tabelas
-
-TYPES: BEGIN OF ty_ska1, "Estrutura - Mestre de Contas do Razão
-  saknr TYPE ska1-saknr, "Nº conta do Razão
-  erdat TYPE ska1-erdat, "Data de Criação do Registro
-END OF ty_ska1.
-
-DATA: t_ska1  TYPE TABLE OF ty_ska1, "Tabela Interna - Estrutura - Mestre de Contas do Razão
-      ls_ska1 TYPE ty_ska1.          "Estrutura - Estrutura - Mestre de Contas do Razão
-
-TYPES: BEGIN OF ty_skb1, "Estrutura - Mestre da Conta do Razão (Empresa)
-  bukrs TYPE skb1-bukrs, "Empresa
-  saknr TYPE skb1-saknr, "Nº conta do Razão
-END OF ty_skb1.
-
-DATA: t_skb1  TYPE TABLE OF ty_skb1, "Tabela Interna - Estrutura - Mestre da Conta do Razão (Empresa)
-      ls_skb1 TYPE ty_skb1.          "Estrutura - Estrutura - Mestre da Conta do Razão (Empresa)
-
-TYPES: BEGIN OF ty_t001, "Estrutura - Empresas
-  bukrs TYPE t001-bukrs, "Empresa
-  butxt TYPE t001-butxt, "Denominação da Firma ou Empresa
-END OF ty_t001.
-
-DATA: t_t001  TYPE TABLE OF ty_t001, "Tabela Interna - Estrutura - Empresa
-      ls_t001 TYPE ty_t001.          "Estrutura - Estrutura - Empresa
-
-TYPES: BEGIN OF ty_skat, "Estrutura - Mestre de Contas do Razão (Denominação)
-  saknr TYPE skat-saknr, "Nº conta do Razão
-  txt20 TYPE skat-txt20, "Texto das Contas do Razão
-END OF ty_skat.
-
-DATA: t_skat  TYPE TABLE OF ty_skat, "Tabela Interna - Estrutura - Mestre de Contas do Razão (Denominação)
-      ls_skat TYPE ty_skat.          "Estrutura - Estrutura - Mestre de Contas do Razão (Denominação)
-
-TYPES: BEGIN OF ty_output, "Estrutura - Tabela de Saída
-  saknr TYPE ska1-saknr,   "Nº conta do Razão
-  erdat TYPE ska1-erdat,   "Data de Criação do Registro
-  bukrs TYPE skb1-bukrs,   "Empresa
-  butxt TYPE t001-butxt,   "Denominação da Firma ou Empresa
-  txt20 TYPE skat-txt20,   "Texto das Contas do Razão
-END OF ty_output.
-
-DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Estrutura - Tabela de Saída
-      ls_output TYPE ty_output.          "Estrutura - Estrutura - Tabela de Saída
-
-DATA: lv_count TYPE i,
-      lv_last_bukrs TYPE skb1-bukrs.
-
-"Inicializa o Contador e Variável que guarda a última empresa.
-lv_count = 0.
-lv_last_bukrs = ''.
-
-"-----------------------------------------------------------------------------------------"
-"-----------------------------------------------------------------------------------------"
-"-----------------------------------------------------------------------------------------"
-
-"---------------
-"Tela de Seleção
-"---------------
-
-*5 - Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
-*o Nº conta do Razão como seleção múltipla. Seu tipo se encontra na tabela SKA1.
+*6 - Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
+*o Centro de lucro como seleção múltipla e a Área de contabilidade de custos também
+*como seleção múltipla. Seus tipos se encontram na tabela CEPC.
 
 SELECTION-SCREEN SKIP 1.
 SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
-  SELECT-OPTIONS s_saknr FOR ska1-saknr DEFAULT '0000001000'. "Campo de Escolha Múltipla - Nº Conta do Razão
+  SELECT-OPTIONS s_prctr FOR cepc-prctr. "Campo de Escolha Múltipla - Centro de Lucro
+  SELECT-OPTIONS s_kokrs FOR cepc-kokrs. "Campo de Escolha Múltipla - Área de Contabilidade de Custos
 SELECTION-SCREEN END OF BLOCK a1.
 SELECTION-SCREEN SKIP 1.
 
-"------------------------
-"Inicialização de Rotinas
-"------------------------
+TYPES: BEGIN OF ty_cepc, "Estrutura - Dados Mestres de Centros de Lucro
+  prctr TYPE cepc-prctr, "Centro de Lucro
+  datbi TYPE cepc-datbi, "Data de Validade Final
+  kokrs TYPE cepc-kokrs, "Área de Contabilidade de Custos
+  datab TYPE cepc-datab, "Data Início Validade
+  usnam TYPE cepc-usnam, "Criado Por
+END OF ty_cepc.
 
-START-OF-SELECTION.
-  PERFORM get_data.
-  PERFORM fill_data.
-  PERFORM display_data.
-END-OF-SELECTION.
+DATA: t_cepc  TYPE TABLE OF ty_cepc, "Tabela Interna - Estrutura - Dados Mestres de Centros de Lucro
+      ls_cepc TYPE ty_cepc.          "Estrutura - Estrutura - Dados Mestres de Centros de Lucro
 
-*&---------------------------------------------------------------------*
-*& Form get_data
-*&---------------------------------------------------------------------*
-*& text
-*&---------------------------------------------------------------------*
-*& -->  p1        text
-*& <--  p2        text
-*&---------------------------------------------------------------------*
-FORM get_data .
+*Selecionar na tabela CEPC todos os Centros de lucro e Área de contabilidade de
+*custos que estiverem de acordo com os dois campos da tela de seleção e a Data de
+*validade final for igual a 31.12.9999, retornando os campos Centro de lucro, Data de
+*validade final, Área de contabilidade de custos, Data início validade e Criado por.
 
-*  Selecionar na tabela SKA1 todas as Contas do Razão que estiverem de acordo
-*  com o campo Nº conta do Razão da tela de seleção e que pertençam ao Plano de
-*  Contas ‘INT’, retornando os campos Nº conta do Razão e Data de criação do registro.
+SELECT prctr, "Selecione Centro de Lucro
+       datbi, "Data de Validade Final
+       kokrs, "Área de Contabilidade de Custos
+       datab, "Data Início Validade
+       usnam  "Criado Por
+       FROM cepc "Da Tabela Transparente - Dados Mestres de Centros de Lucro
+       INTO CORRESPONDING FIELDS OF TABLE @t_cepc "Nos campos correspondetes da Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE prctr IN @s_prctr "Onde Centro de Lucro estiver no range do campo de múltipla escolha
+       AND kokrs IN @s_kokrs "E onde a Área de Contabilidade de Custos estiver no range do campo de múltipla escolha
+       AND datbi = '99991231'.
 
-  SELECT saknr,      "Selecione Nº conta do Razão
-         erdat       "Data de Criação do Registro
-         FROM ska1   "Da Tabela Transparente - Mestre de Contas do Razão
-         INTO CORRESPONDING FIELDS OF TABLE @t_ska1 "Nos campos correspondentes da Tabela Interna - Mestre de Contas do Razão
-         WHERE saknr IN @s_saknr "Onde o Nº conta do Razão está no range do Campo de Escolha Múltipla - Nº Conta do Razão
-         AND ktopl = 'INT'. "E Plano de Contas for 'INT'
+*Para cada registro encontrado na tabela CEPC, selecionar na tabela CEPCT as
+*descrições dos Centros de lucro, onde Código de idioma = ‘PT’ e as duas tabelas são
+*relacionadas pelos campos Centro de lucro, Data de validade final e Área de
+*contabilidade de custos, retornando os campos Centro de lucro, Data de validade final,
+*Área de contabilidade de custos e Texto descritivo.
 
-*  Para cada registro encontrado na tabela SKA1, selecionar na tabela SKB1 as
-*  empresas correspondentes as Contas do Razão encontradas onde o campo Nº conta do
-*  Razão relaciona as duas tabelas, retornando os campos Empresa e Nº conta do Razão.
+TYPES: BEGIN OF ty_cepct, "Estrutura - Dados Mestres de Centros de Lucro
+  prctr TYPE cepct-prctr, "Centro de Lucro
+  datbi TYPE cepct-datbi, "Data de Validade Final
+  kokrs TYPE cepct-kokrs, "Área de Contabilidade de Custos
+  ltext TYPE cepct-ltext, "Texto Descritivo
+END OF ty_cepct.
 
-  SELECT bukrs,    "Seleciona Empresa
-         saknr     "Nº conta do Razão
-         FROM skb1 "Da Tabela Transparente - Mestre de Contas do Razão (Empresa)
-         INTO CORRESPONDING FIELDS OF TABLE @t_skb1 "Nos campos correspondentes da Tabela Interna - Mestre de Contas do Razão (Empresa)
-         FOR ALL ENTRIES IN @t_ska1 "Relacionado com a Tabela Interna - Mestre de Contas do Razão
-         WHERE saknr = @t_ska1-saknr. "Onde os campos Nº conta do Razão são iguais.
+DATA: t_cepct  TYPE TABLE OF ty_cepct, "Tabela Interna - Estrutura - Dados Mestres de Centros de Lucro
+      ls_cepct TYPE ty_cepct.          "Estrutura - Estrutura - Dados Mestres de Centros de Lucro
 
-*  Para cada registro encontrado na tabela SKB1, selecionar na tabela T001 os
-*  dados das empresas selecionadas, onde o campo Empresa relaciona as duas tabelas e
-*  o País seja igual a ‘BR’, retornando os campos Empresa e Denominação da firma ou
-*  empresa.
+SELECT prctr, "Selecione Centro de Lucro
+       datbi, "Data de Validade Final
+       kokrs, "Área de Contabilidade de Custos
+       ltext  "Texto Descritivo
+       FROM cepct "Na Tabela Transparente - Dados Mestres de Centros de Lucro
+       INTO CORRESPONDING FIELDS OF TABLE @t_cepct "Nos campos correspondentes da Tabela Interna - Dados Mestres de Centros de Lucro
+       FOR ALL ENTRIES IN @t_cepc "Relacionada com a Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE prctr = @t_cepc-prctr "Onde as duas possuem os mesmos Centros de Lucros
+       AND datbi = @t_cepc-datbi   "E possuem as mesmas Datas de Validade Final
+       AND kokrs = @t_cepc-kokrs   "E possuem as memas Áreas de Contabilidade de Custos
+       AND spras = 'P'             "E o idioma for Português.
+       AND ltext <> ''.            "Haviam algumas descrições vazias na BD, então inseri está cláusula.
 
-  SELECT bukrs,    "Selecione Empresa
-         butxt     "Denominação da Firma ou Empresa
-         FROM t001 "Da Tabela Transparente - Empresa
-         INTO CORRESPONDING FIELDS OF TABLE @t_t001 "Nos campos correspondentes da Tabela Interna - Empresa
-         FOR ALL ENTRIES IN @t_skb1 "Relacionado com a Tabela Interna - Mestre de Contas do Razão (Empresa)
-         WHERE bukrs = @t_skb1-bukrs "Onde as Empresas são as mesmas
-         AND land1 = 'BR'. "E onde o país é Brasil
+*Para cada registro encontrado na tabela CEPC, selecionar na tabela TKA01 as
+*descrições das Áreas de contabilidade de custos encontradas onde, o campo Área de
+*contabilidade de custos relaciona as duas tabelas. Retornar os campos Área de
+*contabilidade de custos e Denominação da área de contabilidade de custos
 
-*  Para cada registro retornado da tabela SKA1, selecionar na tabela SKAT sua
-*  descrição desde que esta esteja no Código de idioma ‘PT’, Plano de Contas ‘INT’, onde
-*  o campo Nº conta do Razão relaciona as duas tabelas, retornando os campos Nº conta
-*  do Razão e Texto das contas do Razão.
+TYPES: BEGIN OF ty_tka01, "Estrutura - Áreas de Contabilidade de Custos
+  kokrs TYPE tka01-kokrs, "Área de Contabilidade de Custos
+  bezei TYPE tka01-bezei, "Denominação da Área de Contabilidade de Custos
+END OF ty_tka01.
 
-  SELECT saknr,    "Seleciona o Nº conta do Razão
-         txt20     "Texto das Contas do Razão
-         FROM skat "Da Tabela Transparente - Mestre de Contas do Razão (Denominação)
-         INTO CORRESPONDING FIELDS OF TABLE @t_skat "Nos campos correspondentes da Tabela Interna - Mestre de Contas do Razão (Denominação)
-         FOR ALL ENTRIES IN @t_ska1 "Relacionado com a Tabela Interna - Mestre de Contas do Razão
-         WHERE saknr = @t_ska1-saknr "Onde os Nº conta do Razão são iguais
-         AND ktopl = 'INT' "E Plano de Contas = INT
-         AND spras = 'P'.  "Onde o idioma é PT
+DATA: t_tka01  TYPE TABLE OF ty_tka01, "Tabela Interna - Estrutura - Áreas de Contabilidade de Custos
+      ls_tka01 TYPE ty_tka01.          "Estrutura - Estrutura - Áreas de Contabilidade de Custos
 
-ENDFORM.
-*&---------------------------------------------------------------------*
-*& Form fill_data
-*&---------------------------------------------------------------------*
-*& text
-*&---------------------------------------------------------------------*
-*& -->  p1        text
-*& <--  p2        text
-*&---------------------------------------------------------------------*
-FORM fill_data .
+SELECT kokrs, "Selecione a Área de Contabilidade de Custos
+       bezei  "Denominação da Área de Contabilidade de Custos
+       FROM tka01 "Da Tabela Transparente - Áreas de Contabilidade de Custos
+       INTO CORRESPONDING FIELDS OF TABLE @t_tka01 "Nos campos correspondentes da Tabela Interna - Áreas de Contabilidade de Custos
+       FOR ALL ENTRIES IN @t_cepc "Relacionando com os campos da Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE kokrs = @t_cepc-kokrs. "Os a Área de Contabilidade de Custos são iguais.
 
-  "Enche a Tabela de Saída
-  LOOP AT t_ska1 INTO ls_ska1.
-    CLEAR ls_output.
-    LOOP AT t_skb1 INTO ls_skb1 WHERE saknr = ls_ska1-saknr.
-      ls_output-saknr = ls_ska1-saknr.
-      ls_output-erdat = ls_ska1-erdat.
-      ls_output-bukrs = ls_skb1-bukrs.
-      LOOP AT t_t001 INTO ls_t001 WHERE bukrs = ls_skb1-bukrs.
-        ls_output-butxt = ls_t001-butxt.
-      ENDLOOP.
-    ENDLOOP.
-    LOOP AT t_skat INTO ls_skat WHERE saknr = ls_ska1-saknr.
-      ls_output-txt20 = ls_skat-txt20.
-      IF sy-subrc = 0.
-        APPEND ls_output TO t_output.
-      ENDIF.
-    ENDLOOP.
-  ENDLOOP.
+TYPES: BEGIN OF ty_output, "Estrutura de Saída
+  prctr TYPE cepc-prctr,   "Centro de Lucro
+  usnam TYPE cepc-usnam,   "Criado Por
+  datab TYPE cepc-datab,   "Data Início Validade
+  datbi TYPE cepct-datbi,  "Data de Validade Final
+  kokrs TYPE cepct-kokrs,  "Área de Contabilidade de Custos
+  ltext TYPE cepct-ltext,  "Texto Descritivo
+  bezei TYPE tka01-bezei,  "Denominação da Área de Contabilidade de Custos
+END OF ty_output.
 
-ENDFORM.
-*&---------------------------------------------------------------------*
-*& Form display_data
-*&---------------------------------------------------------------------*
-*& text
-*&---------------------------------------------------------------------*
-*& -->  p1        text
-*& <--  p2        text
-*&---------------------------------------------------------------------*
-FORM display_data .
+DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Estrutura de Saída
+      ls_output TYPE ty_output.          "Estrutura - Estrutura - Estrutura de Saída
 
-*  O relatório deve imprimir todas as contas do razão de cada empresa selecionada
-*  do País ‘BR’, bem como os dados da empresa e a descrição da conta do razão no
-*  Código de idioma ‘PT’. Para cada empresa deverá mostrar um contador de contas do
-*  razão e no final do relatório a quantidade de registros encontrados.
-*  Imprimir os campos: Empresa, Denominação da firma ou empresa, Nº conta do
-*  Razão, Data de criação do registro e Texto das contas do Razão.
-*  Exemplo de Layout:
+"Preenche a Tabela de Saída com os dados das consultas.
+LOOP AT t_cepc INTO ls_cepc.
+  READ TABLE t_cepct INTO ls_cepct WITH KEY prctr = ls_cepc-prctr.
+    ls_output-prctr = ls_cepc-prctr.  "Centro de Lucro
+    ls_output-usnam = ls_cepc-usnam.  "Criado Por
+    ls_output-datab = ls_cepc-datab.  "Data Início Validade
+    ls_output-datbi = ls_cepct-datbi. "Data de Validade Final
+    ls_output-kokrs = ls_cepct-kokrs. "Área de Contabilidade de Custos
+    ls_output-ltext = ls_cepct-ltext. "Texto Descritivo
+    READ TABLE t_tka01 INTO ls_tka01 WITH KEY kokrs = ls_cepc-kokrs.
+      ls_output-bezei = ls_tka01-bezei. "Denominação da Área de Contabilidade de Custos
+      APPEND ls_output TO t_output.
+ENDLOOP.
 
-SORT t_output BY bukrs. "Ordena a Tabela de Saída por empresa.
+*O relatório deve imprimir todos os Centros de Lucro de cada Área de contabilidade
+*de custos selecionada. Para cada Área de contabilidade de custos deverá mostrar um
+*contador de Centros de Lucro e no final do relatório a quantidade de registros
+*encontrados.
 
-  "Impressão dos registros por empresa.
-  LOOP AT t_output INTO ls_output.
-    IF lv_last_bukrs <> ls_output-bukrs.
-      IF lv_last_bukrs <> ''.
-        WRITE: / 'Quantidade de Contas Vinculadas:', lv_count.
-        WRITE: / '-----------------------------------------------'.
-      ENDIF.
+*Imprimir os campos: Área de contabilidade de custos, Denominação da área de
+*contabilidade de custos, Centro de lucro, Texto descritivo, Criado por, Data início
+*validade, Data de validade final.
+
+DATA: lv_count TYPE i,
+      lv_count2 TYPE i,
+      lv_last_prctr TYPE cepct-prctr,
+      lv_last_kokrs TYPE cepct-kokrs,
+      lv_total_reg TYPE i.
+
+lv_count = 0.
+lv_count2 = 0.
+lv_total_reg = 0.
+
+SORT t_output BY kokrs prctr.
+
+WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+
+LOOP AT t_output INTO ls_output.
+  IF ls_output-kokrs <> lv_last_kokrs.
+    IF lv_count2 <> 0.
+      WRITE: / 'Total de Centros de Lucro para a Área', lv_last_kokrs, '=', lv_count2.
+      WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+      lv_count2 = 0.
     ENDIF.
-    IF lv_last_bukrs <> ls_output-bukrs.
-      WRITE: / 'Empresa:', ls_output-bukrs,
-             / 'Denominação da Firma ou Empresa:', ls_output-butxt.
-      lv_count = 0.
-    ENDIF.
-    WRITE: / '-----------------------------------------------'.
-    READ TABLE t_skb1 INTO ls_skb1 WITH KEY saknr = ls_output-saknr.
-      WRITE: / 'Nº conta do Razão:', ls_skb1-saknr,
-             / 'Data de Criação do Registro:', ls_output-erdat.
-      READ TABLE t_skat INTO ls_skat WITH KEY saknr = ls_output-saknr.
-        WRITE: / 'Texto das Contas do Razão', ls_skat-txt20.
-        lv_last_bukrs = ls_output-bukrs.
-        lv_count = lv_count + 1.
-        WRITE: / '-----------------------------------------------'.
-  ENDLOOP.
+    WRITE: / 'Área de contabilidade de custos:', ls_output-kokrs.
+    WRITE: / 'Denominação da área de contabilidade de custos:', ls_output-bezei.
+    WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+    lv_last_kokrs = ls_output-kokrs.
+    lv_count = 0.
+  ENDIF.
 
-  "Para pegar o último registro.
-  WRITE: / 'Quantidade de Contas Vinculadas:', lv_count.
-  WRITE: / '-----------------------------------------------'.
+  IF ls_output-prctr <> lv_last_prctr.
+    WRITE: / 'Centro de lucro:', ls_output-prctr,
+           / 'Texto descritivo:', ls_output-ltext,
+           / 'Criado por:', ls_output-usnam,
+           / 'Data início validade:', ls_output-datab,
+           / 'Data de validade final:', ls_output-datbi.
+    WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+    lv_last_prctr = ls_output-prctr.
+    lv_count = lv_count + 1.
+    lv_count2 = lv_count2 + 1.
+    lv_total_reg = lv_total_reg + 1.
+  ENDIF.
+ENDLOOP.
 
-ENDFORM.
+IF lv_count2 <> 0.
+  WRITE: / 'Total de Centros de Lucro para a Área', lv_last_kokrs, '=', lv_count2.
+  WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+ENDIF.
+
+WRITE: / 'Total de registros selecionados =', lv_total_reg.
+WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
