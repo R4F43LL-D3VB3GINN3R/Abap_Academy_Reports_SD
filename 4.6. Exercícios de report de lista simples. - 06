@@ -1,0 +1,90 @@
+*&---------------------------------------------------------------------*
+*& Report ZREPORT_6
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zreport_6.
+
+TABLES: cepc,  "Tabela Transparente - Dados Mestres de Centros de Lucro
+        cepct. "Tabela Transparente - Textos de Dados Mestres de Centro de Lucro
+
+*6 - Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
+*o Centro de lucro como seleção múltipla e a Área de contabilidade de custos também
+*como seleção múltipla. Seus tipos se encontram na tabela CEPC.
+
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
+  SELECT-OPTIONS s_prctr FOR cepc-prctr. "Campo de Escolha Múltipla - Centro de Lucro
+  SELECT-OPTIONS s_kokrs FOR cepc-kokrs. "Campo de Escolha Múltipla - Área de Contabilidade de Custos
+SELECTION-SCREEN END OF BLOCK a1.
+SELECTION-SCREEN SKIP 1.
+
+TYPES: BEGIN OF ty_cepc, "Estrutura - Dados Mestres de Centros de Lucro
+  prctr TYPE cepc-prctr, "Centro de Lucro
+  datbi TYPE cepc-datbi, "Data de Validade Final
+  kokrs TYPE cepc-kokrs, "Área de Contabilidade de Custos
+  datab TYPE cepc-datab, "Data Início Validade
+  usnam TYPE cepc-usnam, "Criado Por
+END OF ty_cepc.
+
+DATA: t_cepc  TYPE TABLE OF ty_cepc, "Tabela Interna - Estrutura - Dados Mestres de Centros de Lucro
+      ls_cepc TYPE ty_cepc.          "Estrutura - Estrutura - Dados Mestres de Centros de Lucro
+
+*Selecionar na tabela CEPC todos os Centros de lucro e Área de contabilidade de
+*custos que estiverem de acordo com os dois campos da tela de seleção e a Data de
+*validade final for igual a 31.12.9999, retornando os campos Centro de lucro, Data de
+*validade final, Área de contabilidade de custos, Data início validade e Criado por.
+
+SELECT prctr, "Selecione Centro de Lucro
+       datbi, "Data de Validade Final
+       kokrs, "Área de Contabilidade de Custos
+       datab, "Data Início Validade
+       usnam  "Criado Por
+       FROM cepc "Da Tabela Transparente - Dados Mestres de Centros de Lucro
+       INTO CORRESPONDING FIELDS OF TABLE @t_cepc "Nos campos correspondetes da Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE prctr IN @s_prctr "Onde Centro de Lucro estiver no range do campo de múltipla escolha
+       AND kokrs IN @s_kokrs "E onde a Área de Contabilidade de Custos estiver no range do campo de múltipla escolha
+       AND datbi = '99991231'.
+
+*Para cada registro encontrado na tabela CEPC, selecionar na tabela CEPCT as
+*descrições dos Centros de lucro, onde Código de idioma = ‘PT’ e as duas tabelas são
+*relacionadas pelos campos Centro de lucro, Data de validade final e Área de
+*contabilidade de custos, retornando os campos Centro de lucro, Data de validade final,
+*Área de contabilidade de custos e Texto descritivo.
+
+TYPES: BEGIN OF ty_cepct, "Estrutura - Dados Mestres de Centros de Lucro
+  prctr TYPE cepct-prctr, "Centro de Lucro
+  datbi TYPE cepct-datbi, "Data de Validade Final
+  kokrs TYPE cepct-kokrs, "Área de Contabilidade de Custos
+  ltext TYPE cepct-ltext, "Texto Descritivo
+END OF ty_cepct.
+
+DATA: t_cepct  TYPE TABLE OF ty_cepct, "Tabela Interna - Estrutura - Dados Mestres de Centros de Lucro
+      ls_cepct TYPE ty_cepct.          "Estrutura - Estrutura - Dados Mestres de Centros de Lucro
+
+SELECT prctr, "Selecione Centro de Lucro
+       datbi, "Data de Validade Final
+       kokrs, "Área de Contabilidade de Custos
+       ltext  "Texto Descritivo
+       FROM cepct "Na Tabela Transparente - Dados Mestres de Centros de Lucro
+       INTO CORRESPONDING FIELDS OF TABLE @t_cepct "Nos campos correspondentes da Tabela Interna - Dados Mestres de Centros de Lucro
+       FOR ALL ENTRIES IN @t_cepc "Relacionada com a Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE prctr = @t_cepc-prctr "Onde as duas possuem os mesmos Centros de Lucros
+       AND datbi = @t_cepc-datbi   "E possuem as mesmas Datas de Validade Final
+       AND kokrs = @t_cepc-kokrs   "E possuem as memas Áreas de Contabilidade de Custos
+       AND spras = 'P'             "E o idioma for Português.
+       AND ltext <> ''.            "Haviam algumas descrições vazias na BD, então inseri está cláusula.
+
+
+
+*Para cada registro encontrado na tabela CEPC, selecionar na tabela TKA01 as
+*descrições das Áreas de contabilidade de custos encontradas onde, o campo Área de
+*contabilidade de custos relaciona as duas tabelas. Retornar os campos Área de
+*contabilidade de custos e Denominação da área de contabilidade de custos
+*O relatório deve imprimir todos os Centros de Lucro de cada Área de contabilidade
+*de custos selecionada. Para cada Área de contabilidade de custos deverá mostrar um
+*contador de Centros de Lucro e no final do relatório a quantidade de registros
+*encontrados.
+*Imprimir os campos: Área de contabilidade de custos, Denominação da área de
+*contabilidade de custos, Centro de lucro, Texto descritivo, Criado por, Data início
+*validade, Data de validade final.
