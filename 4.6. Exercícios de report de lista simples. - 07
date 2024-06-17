@@ -1,0 +1,81 @@
+*&---------------------------------------------------------------------*
+*& Report ZREPORT_7
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zreport_7.
+
+*Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
+*o campo Fornecimento como seleção múltipla e Itinerário como seleção múltipla. Seus
+*tipos se encontram na tabela LIKP.
+
+TABLES: likp, "Tabela Transparente - Fornecimento: Dados de Cabeçalho
+        lips. "Tabela Transparente - Documento SD: Fornecimento: Dados de Item
+
+"------------------
+"Tela de Seleção
+"------------------
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
+  SELECT-OPTIONS s_autlf FOR likp-autlf. "Campo de Múltipla Escolha - Fornecimento
+  SELECT-OPTIONS s_route FOR likp-route. "Campo de Múltipla Escolha - Itinerário
+SELECTION-SCREEN END OF BLOCK a1.
+SELECTION-SCREEN SKIP 1.
+
+TYPES: BEGIN OF ty_likp, "Estrutura - Fornecimento: Dados de Cabeçalho
+  autlf TYPE likp-autlf, "Fornecimento
+  erdat TYPE likp-erdat, "Data de Criação
+  route TYPE likp-route, "Itinerário
+END OF ty_likp.
+
+DATA: t_likp  TYPE TABLE OF ty_likp, "Tabela Interna - Estrutura - Fornecimento: Dados de Cabeçalho
+      ls_likp TYPE ty_likp.          "Estrutura - Estrutura - Fornecimento: Dados de Cabeçalho
+
+*Selecionar na tabela LIKP todos os Fornecimentos criados pelo usuário
+*‘MMUELLER’ (Nome do responsável que adicionou o objeto), que sejam do Local de
+*expedição/local de recebimento de mercadoria = ‘1200’, Organização de vendas = ‘1000’
+*e que tenham Itinerários definidos (Itinerário <> branco), onde o campo Fornecimento
+*seja filtrado pelo campo Fornecimento da tela de seleção e o campo Itinerário seja
+*filtrado pelo campo Itinerário da tela de seleção, retornando os campos Fornecimento,
+*Data de criação do registro e Itinerário.
+
+SELECT autlf, "Selecione Fornecimento
+       erdat, "Data de Criação
+       route  "Itinerário
+       FROM likp "Da Tabela Transparente - Fornecimento: Dados de Cabeçalho
+       INTO CORRESPONDING FIELDS OF TABLE @t_likp "Nos campos correspondentes da Tabela Interna - Estrutura - Fornecimento: Dados de Cabeçalho
+       WHERE ernam = 'S4H_SD' "Onde o Nome do Responsável que Adicionou o Objeto for igual a S4H_SD
+       AND vstel = '1710'     "E Local de Expedição/Local de Recebimento de Mercadoria for igual a '1710'
+       AND vkorg = '1710'     "E Organização de Vendas for igual a '1710'
+       AND route <> ''        "E Itinerário não for vazio
+       AND autlf IN @s_autlf  "E Fornecimento estiver no Campo de Múltipla Escolha - Fornecimento
+       AND route IN @s_route. "E Itinerário estiver no Campo de Múltipla Escolha - Itinerário
+  
+types: begin of ty_lips,
+  autlf type lips-autlf,
+  posnr type lips-posnr,
+  matnr type lips-matnr,
+  werks type lips-werks,
+  lfimg type lips-lfimg,
+  ntgew type lips-ntgew,
+end of ty_lips.
+
+"Impossível continuar, pois o campo fornecimento não relaciona as duas tabelas nesta BD. -----------------------------------
+  
+*Para cada registro encontrado na tabela LIKP, selecionar os Itens de
+*Fornecimento na tabela LIPS onde o campo Fornecimento relaciona as duas tabelas,
+*retornando os campos Fornecimento, Item de remessa, Nº do material, Centro,
+*Quantidade fornecida de fato em UMV e Peso líquido.
+
+*Para cada registro encontrado na tabela LIKP, selecionar na tabela TVROT as
+*descrições dos Itinerários selecionados desde que estas existam com Código de Idioma
+*‘PT’, onde o campo Itinerário relaciona as duas tabelas, retornando os campos: Itinerário
+*e Denominação do Itinerário.
+*Para cada Itinerário (quebra) encontrado na tabela LIKP, o relatório deve exibir
+*seus fornecimentos e itens de fornecimento. No final de cada itinerário deverá ser
+*apresentada uma soma dos campos Quantidade fornecida de fato em UMV e Peso
+*líquido. Deverá também ser exibido um contador com a quantidade de registros
+*encontrados.
+*Imprimir os campos: Itinerário, Denominação do Itinerário, Fornecimento, Data de
+*criação do registro, Item de remessa, Nº do material, Centro, Quantidade fornecida de
+*fato em UMV e Peso líquido.
