@@ -1,1 +1,77 @@
 
+*&---------------------------------------------------------------------*
+*& Report ZREPORT_8
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zreport_8.
+
+*"Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
+*o campo Pagador como seleção múltipla, Documento de faturamento como seleção
+*múltipla e Organização de vendas como seleção única e valor default ‘3020’. Seus tipos
+*se encontram na tabela VBRK.
+
+TABLES: vbrk. "Documento de Faturamento: Dados de Cabeçalho
+
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
+  SELECT-OPTIONS s_kunrg FOR vbrk-kunrg.             "Campo de Seleção Múltipla - Pagador
+  SELECT-OPTIONS s_vbeln FOR vbrk-vbeln.             "Campo de Seleção Múltipla - Documento de Faturamento
+  PARAMETERS p_vkorg TYPE vbrk-vkorg default '1710'. "Organização de Vendas
+SELECTION-SCREEN END OF BLOCK a1.
+SELECTION-SCREEN SKIP 1.
+
+*Selecionar na tabela VBRK todos os Documentos de faturamento que esteja de
+*acordo com o campo Pagador da tela de seleção, Documento de Faturamento da tela de
+*seleção, Organização de vendas da tela de seleção, Tipo documento de faturamento =
+*‘F2’ e Moeda do documento SD = ‘USD’. Retornar os campos Documento de
+*Faturamento, Data doc.faturamento p/índice de docs.faturamto e Pagador.
+
+TYPES: BEGIN OF ty_vbrk, "Documento de Faturamento: Dados de Cabeçalho
+  vbeln TYPE vbrk-vbeln, "Documento de Faturamento
+  fkdat TYPE vbrk-fkdat, "Data do Documento de Faturamento
+  kunag TYPE vbrk-kunag, "Pagador
+END OF ty_vbrk.
+
+DATA: t_vbrk  TYPE TABLE OF ty_vbrk,
+      ls_vbrk TYPE ty_vbrk.
+
+SELECT vbeln, "Selecione Documento de Faturamento
+       fkdat, "Data do Documento de Faturamento
+       kunag  "Pagador
+       FROM vbrk "Da Tabela Documento de Faturamento: Dados de Cabeçalho
+       INTO CORRESPONDING FIELDS OF TABLE @t_vbrk "Nos campos correspondentes da Tabela Interna
+       WHERE kunrg IN @s_kunrg "Onde o Pagador está no range de procura
+       AND vbeln IN @s_vbeln   "E o Documento de Faturamento está no range de procura
+       AND vkorg = @p_vkorg.   "E a Organização de Vendas é igual ao parâmetro
+
+*Para cada registro encontrado na tabela VBRK, selecionar os itens de faturamento
+*na tabela VBRP onde o campo Documentos de faturamento relaciona as duas tabelas,
+*retornando os campos Documento de faturamento, Item do documento de faturamento,
+*Quantidade faturada efetivamente, Peso líquido, Peso bruto, Valor líquido do item de
+*faturamento em moeda do documento e Nº do material.
+
+
+
+*Para cada registro encontrado na tabela VBRK, selecionar na tabela KNA1 os
+*dados do Pagador onde o campo Pagador da tabela VBRK se relaciona com o campo Nº
+*cliente 1 da tabela KNA1 e o campo Chave do país = ‘US’. Retornar os campos Nº
+*cliente 1, Nome 1, Local, Região (país, estado, província, condado) e Rua e nº.
+*Para cada registro encontrado na tabela VBRP, selecionar na tabela MAKT a
+*descrição dos materiais onde o campo Nº do material relaciona as duas tabelas e o
+*campo Código de idioma = ‘PT’. Retornar os campos Nº do material e Texto breve de
+*material.
+*Para cada Pagador (quebra) encontrado na tabela VBRK o relatório deve exibir
+*seus Documentos de faturamento e itens do documento de faturamento. No final de cada
+*Documento de Faturamento deverá ser apresentada a soma dos campos Quantidade
+*faturada efetivamente, Peso líquido, Peso bruto, Valor líquido do item de faturamento em
+*moeda do documento. No final de cada Pagador também deverá ser apresentada a
+*soma dos campos Quantidade faturada efetivamente, Peso líquido, Peso bruto, Valor
+*líquido do item de faturamento em moeda do documento. Deverá ser exibido um
+*contador com a quantidade de Documento de Faturamento para um mesmo pagador e
+*no final um contador com a quantidade de registros encontrados.
+*Imprimir os campos: Pagador, Documento de Faturamento, Data doc.faturamento
+*p/índice de docs.faturamto, Nome 1, Local, Região, Rua e nº, Item do documento de
+*faturamento, Nº do material, Texto breve de material, Quantidade faturada efetivamente,
+*Peso líquido, Peso bruto e Valor líquido do item de faturamento em moeda do
+*documento.
