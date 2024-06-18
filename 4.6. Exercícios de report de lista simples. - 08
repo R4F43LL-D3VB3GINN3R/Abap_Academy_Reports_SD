@@ -12,7 +12,7 @@ REPORT zreport_8.
 
 TABLES: vbrk, "Documento de Faturamento: Dados de Cabeçalho
         vbrp, "Documento de Faturamento: Dados de Item
-        kna1. "Mestre de clientes (Parte Geral) 
+        kna1. "Mestre de clientes (Parte Geral)
 
 SELECTION-SCREEN SKIP 1.
 SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
@@ -45,7 +45,7 @@ SELECT vbeln, "Selecione Documento de Faturamento
        WHERE kunrg IN @s_kunrg "Onde o Pagador está no range de procura
        AND vbeln IN @s_vbeln   "E o Documento de Faturamento está no range de procura
        AND vkorg = @p_vkorg.   "E a Organização de Vendas é igual ao parâmetro
-  
+
 *Para cada registro encontrado na tabela VBRK, selecionar os itens de faturamento
 *na tabela VBRP onde o campo Documentos de faturamento relaciona as duas tabelas,
 *retornando os campos Documento de faturamento, Item do documento de faturamento,
@@ -75,25 +75,28 @@ SELECT vbeln, "Selecione Documento de Faturamento
        FROM vbrp "Da Tabela Transparente - Documento de Faturamento: Dados de Item
        INTO CORRESPONDING FIELDS OF TABLE @t_vbrp "Nos campos correspondentes da Tabela Interna - Documento de Faturamento: Dados de Item
        FOR ALL ENTRIES IN @t_vbrk "Relaciona a Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
-       WHERE vbeln = @t_vbrk-vbeln. "Onde  os Documentos de Faturamento são os mesmos.
+       WHERE vbeln = @t_vbrk-vbeln. "Onde os Documentos de Faturamento são os mesmos.
 
 *Para cada registro encontrado na tabela VBRK, selecionar na tabela KNA1 os
 *dados do Pagador onde o campo Pagador da tabela VBRK se relaciona com o campo Nº
 *cliente 1 da tabela KNA1 e o campo Chave do país = ‘US’. Retornar os campos Nº
 *cliente 1, Nome 1, Local, Região (país, estado, província, condado) e Rua e nº.
 
-types: begin of ty_kna1, "Estrutura - Mestre de clientes (Parte Geral) 
-  kunnr type kna1-kunnr, "Nº Cliente 1
-  name1 type kna1-name1, "Nome 1
-  ort01 type kna1-ort01, "Local
-  regio type kna1-regio, "Região (país, estado, província, condado)
-  stras type kna1-stras, "Rua e Nº
-end of ty_kna1.
+TYPES: BEGIN OF ty_kna1, "Estrutura - Mestre de clientes (Parte Geral)
+  kunnr TYPE kna1-kunnr, "Nº Cliente 1
+  name1 TYPE kna1-name1, "Nome 1
+  ort01 TYPE kna1-ort01, "Local
+  regio TYPE kna1-regio, "Região (país, estado, província, condado)
+  stras TYPE kna1-stras, "Rua e Nº
+END OF ty_kna1.
 
-data: t_kna1  type table of ty_kna1, "Tabela Interna - Estrutura - Mestre de clientes (Parte Geral) 
-      ls_kna1 type ty_kna1.          "Estrutura - Estrutura - Mestre de clientes (Parte Geral) 
+DATA: t_kna1  TYPE TABLE OF ty_kna1, "Tabela Interna - Estrutura - Mestre de clientes (Parte Geral)
+      ls_kna1 TYPE ty_kna1.          "Estrutura - Estrutura - Mestre de clientes (Parte Geral)
 
-
+SELECT kunnr, name1, ort01, regio, stras FROM kna1
+  INTO CORRESPONDING FIELDS OF TABLE @t_kna1
+  FOR ALL ENTRIES IN @t_vbrk
+  WHERE kunnr = @t_vbrk-kunag.
 
 *Para cada registro encontrado na tabela VBRP, selecionar na tabela MAKT a
 *descrição dos materiais onde o campo Nº do material relaciona as duas tabelas e o
