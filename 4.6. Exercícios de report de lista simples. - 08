@@ -1,4 +1,3 @@
-
 *&---------------------------------------------------------------------*
 *& Report ZREPORT_8
 *&---------------------------------------------------------------------*
@@ -11,13 +10,14 @@ REPORT zreport_8.
 *múltipla e Organização de vendas como seleção única e valor default ‘3020’. Seus tipos
 *se encontram na tabela VBRK.
 
-TABLES: vbrk. "Documento de Faturamento: Dados de Cabeçalho
+TABLES: vbrk, "Documento de Faturamento: Dados de Cabeçalho
+        vbrp. "Documento de Faturamento: Dados de Item
 
 SELECTION-SCREEN SKIP 1.
 SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
   SELECT-OPTIONS s_kunrg FOR vbrk-kunrg.             "Campo de Seleção Múltipla - Pagador
   SELECT-OPTIONS s_vbeln FOR vbrk-vbeln.             "Campo de Seleção Múltipla - Documento de Faturamento
-  PARAMETERS p_vkorg TYPE vbrk-vkorg default '1710'. "Organização de Vendas
+  PARAMETERS p_vkorg TYPE vbrk-vkorg DEFAULT '1710'. "Organização de Vendas
 SELECTION-SCREEN END OF BLOCK a1.
 SELECTION-SCREEN SKIP 1.
 
@@ -44,6 +44,31 @@ SELECT vbeln, "Selecione Documento de Faturamento
        WHERE kunrg IN @s_kunrg "Onde o Pagador está no range de procura
        AND vbeln IN @s_vbeln   "E o Documento de Faturamento está no range de procura
        AND vkorg = @p_vkorg.   "E a Organização de Vendas é igual ao parâmetro
+
+TYPES: BEGIN OF ty_vbrp, "Estrutura - Documento de Faturamento: Dados de Item
+  vbeln TYPE vbrp-vbeln, "Documento de Faturamento
+  fkimg TYPE vbrp-fkimg, "Quantidade Faturada Efetivamente
+  posnr TYPE vbrp-posnr, "Item do Documento de Faturamento
+  brgew TYPE vbrp-brgew, "Peso Bruto
+  ntgew TYPE vbrp-ntgew, "Peso Líquido
+  netwr TYPE vbrp-netwr, "Valor Líquido do Item de Faturamento em Moeda do Documento
+  matnr TYPE vbrp-matnr, "Número do Material
+END OF ty_vbrp.
+
+DATA: t_vbrp  TYPE TABLE OF ty_vbrp, "Tabela Interna - Estrutura - Documento de Faturamento: Dados de Item
+      ls_vbrp TYPE ty_vbrp.          "Estutura - Estrutura - Documento de Faturamento: Dados de Item
+
+SELECT vbeln, "Selecione Documento de Faturamento
+       fkimg, "Quantidade Faturada Efetivamente
+       posnr, "Item do Documento de Faturamento
+       brgew, "Peso Bruto
+       ntgew, "Peso Líquido
+       netwr, "Valor Líquido do Item de Faturamento em Moeda do Documento
+       matnr  "Número do Material
+       FROM vbrp "Da Tabela Transparente - Documento de Faturamento: Dados de Item
+       INTO CORRESPONDING FIELDS OF TABLE @t_vbrp "Nos campos correspondentes da Tabela Interna - Documento de Faturamento: Dados de Item
+       FOR ALL ENTRIES IN @t_vbrk "Relaciona a Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
+       WHERE vbeln = @t_vbrk-vbeln. "Onde  os Documentos de Faturamento são os mesmos.
 
 *Para cada registro encontrado na tabela VBRK, selecionar os itens de faturamento
 *na tabela VBRP onde o campo Documentos de faturamento relaciona as duas tabelas,
