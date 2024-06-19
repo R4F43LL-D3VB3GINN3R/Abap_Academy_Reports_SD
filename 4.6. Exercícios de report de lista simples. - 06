@@ -1,163 +1,232 @@
 *&---------------------------------------------------------------------*
-*& Report ZREPORT_8
+*& Report ZREPORT_6
 *&---------------------------------------------------------------------*
 *&
 *&---------------------------------------------------------------------*
-REPORT zreport_8.
+REPORT zreport_6.
 
-*"Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
-*o campo Pagador como seleção múltipla, Documento de faturamento como seleção
-*múltipla e Organização de vendas como seleção única e valor default ‘3020’. Seus tipos
-*se encontram na tabela VBRK.
+TABLES: cepc,  "Tabela Transparente - Dados Mestres de Centros de Lucro
+        cepct, "Tabela Transparente - Textos de Dados Mestres de Centro de Lucro
+        tka01. "Áreas de Contabilidade de Custos
 
-TABLES: vbrk, "Documento de Faturamento: Dados de Cabeçalho
-        vbrp, "Documento de Faturamento: Dados de Item
-        kna1, "Mestre de clientes (Parte Geral)
-        makt. "Textos Breves de Material
+"------------------------------------------------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------------------------------------------------"
+"Variáveis, Estruturas e Tabelas
+
+TYPES: BEGIN OF ty_cepc, "Estrutura - Dados Mestres de Centros de Lucro
+  prctr TYPE cepc-prctr, "Centro de Lucro
+  datbi TYPE cepc-datbi, "Data de Validade Final
+  kokrs TYPE cepc-kokrs, "Área de Contabilidade de Custos
+  datab TYPE cepc-datab, "Data Início Validade
+  usnam TYPE cepc-usnam, "Criado Por
+END OF ty_cepc.
+
+DATA: t_cepc  TYPE TABLE OF ty_cepc, "Tabela Interna - Estrutura - Dados Mestres de Centros de Lucro
+      ls_cepc TYPE ty_cepc.          "Estrutura - Estrutura - Dados Mestres de Centros de Lucro
+
+TYPES: BEGIN OF ty_cepct, "Estrutura - Dados Mestres de Centros de Lucro
+  prctr TYPE cepct-prctr, "Centro de Lucro
+  datbi TYPE cepct-datbi, "Data de Validade Final
+  kokrs TYPE cepct-kokrs, "Área de Contabilidade de Custos
+  ltext TYPE cepct-ltext, "Texto Descritivo
+END OF ty_cepct.
+
+DATA: t_cepct  TYPE TABLE OF ty_cepct, "Tabela Interna - Estrutura - Dados Mestres de Centros de Lucro
+      ls_cepct TYPE ty_cepct.          "Estrutura - Estrutura - Dados Mestres de Centros de Lucro
+
+TYPES: BEGIN OF ty_tka01, "Estrutura - Áreas de Contabilidade de Custos
+  kokrs TYPE tka01-kokrs, "Área de Contabilidade de Custos
+  bezei TYPE tka01-bezei, "Denominação da Área de Contabilidade de Custos
+END OF ty_tka01.
+
+DATA: t_tka01  TYPE TABLE OF ty_tka01, "Tabela Interna - Estrutura - Áreas de Contabilidade de Custos
+      ls_tka01 TYPE ty_tka01.          "Estrutura - Estrutura - Áreas de Contabilidade de Custos
+
+TYPES: BEGIN OF ty_output, "Estrutura de Saída
+  prctr TYPE cepc-prctr,   "Centro de Lucro
+  usnam TYPE cepc-usnam,   "Criado Por
+  datab TYPE cepc-datab,   "Data Início Validade
+  datbi TYPE cepct-datbi,  "Data de Validade Final
+  kokrs TYPE cepct-kokrs,  "Área de Contabilidade de Custos
+  ltext TYPE cepct-ltext,  "Texto Descritivo
+  bezei TYPE tka01-bezei,  "Denominação da Área de Contabilidade de Custos
+END OF ty_output.
+
+DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Estrutura de Saída
+      ls_output TYPE ty_output.          "Estrutura - Estrutura - Estrutura de Saída
+
+DATA: lv_count TYPE i,
+      lv_count2 TYPE i,
+      lv_last_prctr TYPE cepct-prctr,
+      lv_last_kokrs TYPE cepct-kokrs,
+      lv_total_reg TYPE i.
+
+lv_count = 0.
+lv_count2 = 0.
+lv_total_reg = 0.
+
+"------------------------------------------------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------------------------------------------------"
+
+*6 - Elaborar um programa ABAP onde deverá ser criada uma tela de seleção com
+*o Centro de lucro como seleção múltipla e a Área de contabilidade de custos também
+*como seleção múltipla. Seus tipos se encontram na tabela CEPC.
 
 SELECTION-SCREEN SKIP 1.
 SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
-  SELECT-OPTIONS s_kunrg FOR vbrk-kunrg.             "Campo de Seleção Múltipla - Pagador
-  SELECT-OPTIONS s_vbeln FOR vbrk-vbeln.             "Campo de Seleção Múltipla - Documento de Faturamento
-  PARAMETERS p_vkorg TYPE vbrk-vkorg DEFAULT '1710'. "Organização de Vendas
+  SELECT-OPTIONS s_prctr FOR cepc-prctr. "Campo de Escolha Múltipla - Centro de Lucro
+  SELECT-OPTIONS s_kokrs FOR cepc-kokrs. "Campo de Escolha Múltipla - Área de Contabilidade de Custos
 SELECTION-SCREEN END OF BLOCK a1.
 SELECTION-SCREEN SKIP 1.
 
-*Selecionar na tabela VBRK todos os Documentos de faturamento que esteja de
-*acordo com o campo Pagador da tela de seleção, Documento de Faturamento da tela de
-*seleção, Organização de vendas da tela de seleção, Tipo documento de faturamento =
-*‘F2’ e Moeda do documento SD = ‘USD’. Retornar os campos Documento de
-*Faturamento, Data doc.faturamento p/índice de docs.faturamto e Pagador.
+START-OF-SELECTION.
+  PERFORM get_data.
+  PERFORM fill_data.
+  PERFORM display_data.
+END-OF-SELECTION.
 
-TYPES: BEGIN OF ty_vbrk, "Documento de Faturamento: Dados de Cabeçalho
-  vbeln TYPE vbrk-vbeln, "Documento de Faturamento
-  fkdat TYPE vbrk-fkdat, "Data do Documento de Faturamento
-  kunag TYPE vbrk-kunag, "Pagador
-END OF ty_vbrk.
+*&---------------------------------------------------------------------*
+*& Form get_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_data .
 
-DATA: t_vbrk  TYPE TABLE OF ty_vbrk,
-      ls_vbrk TYPE ty_vbrk.
+*Selecionar na tabela CEPC todos os Centros de lucro e Área de contabilidade de
+*custos que estiverem de acordo com os dois campos da tela de seleção e a Data de
+*validade final for igual a 31.12.9999, retornando os campos Centro de lucro, Data de
+*validade final, Área de contabilidade de custos, Data início validade e Criado por.
 
-SELECT vbeln, "Selecione Documento de Faturamento
-       fkdat, "Data do Documento de Faturamento
-       kunag  "Pagador
-       FROM vbrk "Da Tabela Documento de Faturamento: Dados de Cabeçalho
-       INTO CORRESPONDING FIELDS OF TABLE @t_vbrk "Nos campos correspondentes da Tabela Interna
-       WHERE kunrg IN @s_kunrg "Onde o Pagador está no range de procura
-       AND vbeln IN @s_vbeln   "E o Documento de Faturamento está no range de procura
-       AND vkorg = @p_vkorg.   "E a Organização de Vendas é igual ao parâmetro
+SELECT prctr, "Selecione Centro de Lucro
+       datbi, "Data de Validade Final
+       kokrs, "Área de Contabilidade de Custos
+       datab, "Data Início Validade
+       usnam  "Criado Por
+       FROM cepc "Da Tabela Transparente - Dados Mestres de Centros de Lucro
+       INTO CORRESPONDING FIELDS OF TABLE @t_cepc "Nos campos correspondetes da Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE prctr IN @s_prctr "Onde Centro de Lucro estiver no range do campo de múltipla escolha
+       AND kokrs IN @s_kokrs "E onde a Área de Contabilidade de Custos estiver no range do campo de múltipla escolha
+       AND datbi = '99991231'.
 
-*Para cada registro encontrado na tabela VBRK, selecionar os itens de faturamento
-*na tabela VBRP onde o campo Documentos de faturamento relaciona as duas tabelas,
-*retornando os campos Documento de faturamento, Item do documento de faturamento,
-*Quantidade faturada efetivamente, Peso líquido, Peso bruto, Valor líquido do item de
-*faturamento em moeda do documento e Nº do material.
+*Para cada registro encontrado na tabela CEPC, selecionar na tabela CEPCT as
+*descrições dos Centros de lucro, onde Código de idioma = ‘PT’ e as duas tabelas são
+*relacionadas pelos campos Centro de lucro, Data de validade final e Área de
+*contabilidade de custos, retornando os campos Centro de lucro, Data de validade final,
+*Área de contabilidade de custos e Texto descritivo.
 
-TYPES: BEGIN OF ty_vbrp, "Estrutura - Documento de Faturamento: Dados de Item
-  vbeln TYPE vbrp-vbeln, "Documento de Faturamento
-  fkimg TYPE vbrp-fkimg, "Quantidade Faturada Efetivamente
-  posnr TYPE vbrp-posnr, "Item do Documento de Faturamento
-  brgew TYPE vbrp-brgew, "Peso Bruto
-  ntgew TYPE vbrp-ntgew, "Peso Líquido
-  netwr TYPE vbrp-netwr, "Valor Líquido do Item de Faturamento em Moeda do Documento
-  matnr TYPE vbrp-matnr, "Número do Material
-END OF ty_vbrp.
+SELECT prctr, "Selecione Centro de Lucro
+       datbi, "Data de Validade Final
+       kokrs, "Área de Contabilidade de Custos
+       ltext  "Texto Descritivo
+       FROM cepct "Na Tabela Transparente - Dados Mestres de Centros de Lucro
+       INTO CORRESPONDING FIELDS OF TABLE @t_cepct "Nos campos correspondentes da Tabela Interna - Dados Mestres de Centros de Lucro
+       FOR ALL ENTRIES IN @t_cepc "Relacionada com a Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE prctr = @t_cepc-prctr "Onde as duas possuem os mesmos Centros de Lucros
+       AND datbi = @t_cepc-datbi   "E possuem as mesmas Datas de Validade Final
+       AND kokrs = @t_cepc-kokrs   "E possuem as memas Áreas de Contabilidade de Custos
+       AND spras = 'P'             "E o idioma for Português.
+       AND ltext <> ''.            "Haviam algumas descrições vazias na BD, então inseri está cláusula.
 
-DATA: t_vbrp  TYPE TABLE OF ty_vbrp, "Tabela Interna - Estrutura - Documento de Faturamento: Dados de Item
-      ls_vbrp TYPE ty_vbrp.          "Estutura - Estrutura - Documento de Faturamento: Dados de Item
+*Para cada registro encontrado na tabela CEPC, selecionar na tabela TKA01 as
+*descrições das Áreas de contabilidade de custos encontradas onde, o campo Área de
+*contabilidade de custos relaciona as duas tabelas. Retornar os campos Área de
+*contabilidade de custos e Denominação da área de contabilidade de custos
 
-SELECT vbeln, "Selecione Documento de Faturamento
-       fkimg, "Quantidade Faturada Efetivamente
-       posnr, "Item do Documento de Faturamento
-       brgew, "Peso Bruto
-       ntgew, "Peso Líquido
-       netwr, "Valor Líquido do Item de Faturamento em Moeda do Documento
-       matnr  "Número do Material
-       FROM vbrp "Da Tabela Transparente - Documento de Faturamento: Dados de Item
-       INTO CORRESPONDING FIELDS OF TABLE @t_vbrp "Nos campos correspondentes da Tabela Interna - Documento de Faturamento: Dados de Item
-       FOR ALL ENTRIES IN @t_vbrk "Relaciona a Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
-       WHERE vbeln = @t_vbrk-vbeln "Onde os Documentos de Faturamento são os mesmos.
-       AND aland = 'US'.
+SELECT kokrs, "Selecione a Área de Contabilidade de Custos
+       bezei  "Denominação da Área de Contabilidade de Custos
+       FROM tka01 "Da Tabela Transparente - Áreas de Contabilidade de Custos
+       INTO CORRESPONDING FIELDS OF TABLE @t_tka01 "Nos campos correspondentes da Tabela Interna - Áreas de Contabilidade de Custos
+       FOR ALL ENTRIES IN @t_cepc "Relacionando com os campos da Tabela Interna - Dados Mestres de Centros de Lucro
+       WHERE kokrs = @t_cepc-kokrs. "Os a Área de Contabilidade de Custos são iguais.
 
-*Para cada registro encontrado na tabela VBRK, selecionar na tabela KNA1 os
-*dados do Pagador onde o campo Pagador da tabela VBRK se relaciona com o campo Nº
-*cliente 1 da tabela KNA1 e o campo Chave do país = ‘US’. Retornar os campos Nº
-*cliente 1, Nome 1, Local, Região (país, estado, província, condado) e Rua e nº.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form fill_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_data .
 
-TYPES: BEGIN OF ty_kna1, "Estrutura - Mestre de clientes (Parte Geral)
-  kunnr TYPE kna1-kunnr, "Nº Cliente 1
-  name1 TYPE kna1-name1, "Nome 1
-  ort01 TYPE kna1-ort01, "Local
-  regio TYPE kna1-regio, "Região (país, estado, província, condado)
-  stras TYPE kna1-stras, "Rua e Nº
-END OF ty_kna1.
+  "Preenche a Tabela de Saída com os dados das consultas.
+  LOOP AT t_cepc INTO ls_cepc.
+    READ TABLE t_cepct INTO ls_cepct WITH KEY prctr = ls_cepc-prctr.
+      ls_output-prctr = ls_cepc-prctr.  "Centro de Lucro
+      ls_output-usnam = ls_cepc-usnam.  "Criado Por
+      ls_output-datab = ls_cepc-datab.  "Data Início Validade
+      ls_output-datbi = ls_cepct-datbi. "Data de Validade Final
+      ls_output-kokrs = ls_cepct-kokrs. "Área de Contabilidade de Custos
+      ls_output-ltext = ls_cepct-ltext. "Texto Descritivo
+      READ TABLE t_tka01 INTO ls_tka01 WITH KEY kokrs = ls_cepc-kokrs.
+        ls_output-bezei = ls_tka01-bezei. "Denominação da Área de Contabilidade de Custos
+        APPEND ls_output TO t_output.
+  ENDLOOP.
 
-DATA: t_kna1  TYPE TABLE OF ty_kna1, "Tabela Interna - Estrutura - Mestre de clientes (Parte Geral)
-      ls_kna1 TYPE ty_kna1.          "Estrutura - Estrutura - Mestre de clientes (Parte Geral)
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form display_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM display_data .
 
-SELECT kunnr, "Selecione Nº Cliente 1
-       name1, "Nome 1
-       ort01, "Local
-       regio, "Região (país, estado, província, condado)
-       stras  "Rua e Nº
-       FROM kna1 "Da Tabela Transparente - Mestre de clientes (Parte Geral)
-       INTO CORRESPONDING FIELDS OF TABLE @t_kna1 "Nos campos correspondentes da Tabela Interna - Mestre de clientes (Parte Geral)
-       FOR ALL ENTRIES IN @t_vbrk "Relacionando com a Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
-       WHERE kunnr = @t_vbrk-kunag. "Onde o Nº Cliente 1 é igual ao Pagador
+*O relatório deve imprimir todos os Centros de Lucro de cada Área de contabilidade
+*de custos selecionada. Para cada Área de contabilidade de custos deverá mostrar um
+*contador de Centros de Lucro e no final do relatório a quantidade de registros
+*encontrados.
 
-*Para cada registro encontrado na tabela VBRP, selecionar na tabela MAKT a
-*descrição dos materiais onde o campo Nº do material relaciona as duas tabelas e o
-*campo Código de idioma = ‘PT’. Retornar os campos Nº do material e Texto breve de
-*material.
+*Imprimir os campos: Área de contabilidade de custos, Denominação da área de
+*contabilidade de custos, Centro de lucro, Texto descritivo, Criado por, Data início
+*validade, Data de validade final.
 
-TYPES: BEGIN OF ty_makt, "Estrutura - Textos Breves de Material
-  matnr TYPE makt-matnr, "Número do Material
-  maktx TYPE makt-maktx, "Texto Breve de Material.
-END OF ty_makt.
+  SORT t_output BY kokrs prctr.
 
-DATA: t_makt  TYPE TABLE OF ty_makt, "Tabela Interna - Estrutura - Textos Breves de Material
-      ls_makt TYPE ty_makt.          "Estrutura - Estrutura - Textos Breves de Material
+  WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
 
-SELECT matnr, "Número do Material
-       maktx  "Texto Breve de Material.
-       FROM makt "Da Tabela Transparente - Textos Breves de Material
-       INTO CORRESPONDING FIELDS OF TABLE @t_makt "Nos campos correspondentes da Tabela Interna - Textos Breves de Material
-       FOR ALL ENTRIES IN @t_vbrp "Relacionando com a Tabela Interna - Documento de Faturamento: Dados de Item
-       WHERE spras = 'P'          "Onde o idioma é Português
-       AND matnr = @t_vbrp-matnr. "E os números de materiais são os mesmos.
+  LOOP AT t_output INTO ls_output.
+    IF ls_output-kokrs <> lv_last_kokrs.
+      IF lv_count2 <> 0.
+        WRITE: / 'Total de Centros de Lucro para a Área', lv_last_kokrs, '=', lv_count2.
+        WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+        lv_count2 = 0.
+      ENDIF.
+      WRITE: / 'Área de contabilidade de custos:', ls_output-kokrs.
+      WRITE: / 'Denominação da área de contabilidade de custos:', ls_output-bezei.
+      WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+      lv_last_kokrs = ls_output-kokrs.
+      lv_count = 0.
+    ENDIF.
 
-*Para cada Pagador (quebra) encontrado na tabela VBRK o relatório deve exibir
-*seus Documentos de faturamento e itens do documento de faturamento.
+    IF ls_output-prctr <> lv_last_prctr.
+      WRITE: / 'Centro de lucro:', ls_output-prctr,
+             / 'Texto descritivo:', ls_output-ltext,
+             / 'Criado por:', ls_output-usnam,
+             / 'Data início validade:', ls_output-datab,
+             / 'Data de validade final:', ls_output-datbi.
+      WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+      lv_last_prctr = ls_output-prctr.
+      lv_count = lv_count + 1.
+      lv_count2 = lv_count2 + 1.
+      lv_total_reg = lv_total_reg + 1.
+    ENDIF.
+  ENDLOOP.
 
-DATA: lv_last_posnr TYPE vbrp-posnr.
+  IF lv_count2 <> 0.
+    WRITE: / 'Total de Centros de Lucro para a Área', lv_last_kokrs, '=', lv_count2.
+    WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+  ENDIF.
 
-WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
-LOOP AT t_vbrp INTO ls_vbrp.
-  READ TABLE t_vbrk INTO ls_vbrk WITH KEY vbeln = ls_vbrp-vbeln.
-    WRITE: / 'Documento de Faturamento: ', ls_vbrk-vbeln.
-    WRITE: / 'Emitido em: ', ls_vbrk-fkdat.
-    WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
-    WRITE: / 'Item do Documento de Faturamento: ', ls_vbrp-posnr.
-    
-*    No final de cada documento de Faturamento deverá ser apresentada a soma dos campos Quantidade
-*    faturada efetivamente, Peso líquido, Peso bruto, Valor líquido do item de faturamento em
-*    moeda do documento.
-    
-    WRITE: / 'Quantidade Faturada: ', ls_vbrp-fkimg.
-    WRITE: / 'Peso Bruto: ', ls_vbrp-brgew.
-    WRITE: / 'Peso Líquido: ', ls_vbrp-ntgew.
-    WRITE: / 'Valor Líquido: ', ls_vbrp-netwr.
-    WRITE: / 'Número do Material: ', ls_vbrp-matnr.
-    WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
-ENDLOOP.
+  WRITE: / 'Total de registros selecionados =', lv_total_reg.
+  WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
 
-*No final de cada Pagador também deverá ser apresentada a
-*soma dos campos Quantidade faturada efetivamente, Peso líquido, Peso bruto, Valor
-*líquido do item de faturamento em moeda do documento. Deverá ser exibido um
-*contador com a quantidade de Documento de Faturamento para um mesmo pagador e
-*no final um contador com a quantidade de registros encontrados.
-*Imprimir os campos: Pagador, Documento de Faturamento, Data doc.faturamento
-*p/índice de docs.faturamto, Nome 1, Local, Região, Rua e nº, Item do documento de
-*faturamento, Nº do material, Texto breve de material, Quantidade faturada efetivamente,
-*Peso líquido, Peso bruto e Valor líquido do item de faturamento em moeda do
-*documento.
+ENDFORM.
