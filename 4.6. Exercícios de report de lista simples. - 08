@@ -12,7 +12,8 @@ REPORT zreport_8.
 
 TABLES: vbrk, "Documento de Faturamento: Dados de Cabeçalho
         vbrp, "Documento de Faturamento: Dados de Item
-        kna1. "Mestre de clientes (Parte Geral)
+        kna1, "Mestre de clientes (Parte Geral)
+        makt. "Textos Breves de Material
 
 SELECTION-SCREEN SKIP 1.
 SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
@@ -75,7 +76,8 @@ SELECT vbeln, "Selecione Documento de Faturamento
        FROM vbrp "Da Tabela Transparente - Documento de Faturamento: Dados de Item
        INTO CORRESPONDING FIELDS OF TABLE @t_vbrp "Nos campos correspondentes da Tabela Interna - Documento de Faturamento: Dados de Item
        FOR ALL ENTRIES IN @t_vbrk "Relaciona a Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
-       WHERE vbeln = @t_vbrk-vbeln. "Onde os Documentos de Faturamento são os mesmos.
+       WHERE vbeln = @t_vbrk-vbeln "Onde os Documentos de Faturamento são os mesmos.
+       AND aland = 'US'.
 
 *Para cada registro encontrado na tabela VBRK, selecionar na tabela KNA1 os
 *dados do Pagador onde o campo Pagador da tabela VBRK se relaciona com o campo Nº
@@ -93,15 +95,37 @@ END OF ty_kna1.
 DATA: t_kna1  TYPE TABLE OF ty_kna1, "Tabela Interna - Estrutura - Mestre de clientes (Parte Geral)
       ls_kna1 TYPE ty_kna1.          "Estrutura - Estrutura - Mestre de clientes (Parte Geral)
 
-SELECT kunnr, name1, ort01, regio, stras FROM kna1
-  INTO CORRESPONDING FIELDS OF TABLE @t_kna1
-  FOR ALL ENTRIES IN @t_vbrk
-  WHERE kunnr = @t_vbrk-kunag.
-
+SELECT kunnr, "Selecione Nº Cliente 1
+       name1, "Nome 1
+       ort01, "Local
+       regio, "Região (país, estado, província, condado)
+       stras  "Rua e Nº
+       FROM kna1 "Da Tabela Transparente - Mestre de clientes (Parte Geral)
+       INTO CORRESPONDING FIELDS OF TABLE @t_kna1 "Nos campos correspondentes da Tabela Interna - Mestre de clientes (Parte Geral)
+       FOR ALL ENTRIES IN @t_vbrk "Relacionando com a Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
+       WHERE kunnr = @t_vbrk-kunag. "Onde o Nº Cliente 1 é igual ao Pagador
+  
 *Para cada registro encontrado na tabela VBRP, selecionar na tabela MAKT a
 *descrição dos materiais onde o campo Nº do material relaciona as duas tabelas e o
 *campo Código de idioma = ‘PT’. Retornar os campos Nº do material e Texto breve de
 *material.
+
+TYPES: BEGIN OF ty_makt, "Estrutura - Textos Breves de Material
+  matnr TYPE makt-matnr, "Número do Material
+  maktx TYPE makt-maktx, "Texto Breve de Material.
+END OF ty_makt.
+
+DATA: t_makt  TYPE TABLE OF ty_makt, "Tabela Interna - Estrutura - Textos Breves de Material
+      ls_makt TYPE ty_makt.          "Estrutura - Estrutura - Textos Breves de Material
+
+SELECT matnr, "Número do Material
+       maktx  "Texto Breve de Material.
+       FROM makt "Da Tabela Transparente - Textos Breves de Material
+       INTO CORRESPONDING FIELDS OF TABLE @t_makt "Nos campos correspondentes da Tabela Interna - Textos Breves de Material
+       FOR ALL ENTRIES IN @t_vbrp "Relacionando com a Tabela Interna - Documento de Faturamento: Dados de Item
+       WHERE spras = 'P'          "Onde o idioma é Português
+       AND matnr = @t_vbrp-matnr. "E os números de materiais são os mesmos.
+
 *Para cada Pagador (quebra) encontrado na tabela VBRK o relatório deve exibir
 *seus Documentos de faturamento e itens do documento de faturamento. No final de cada
 *Documento de Faturamento deverá ser apresentada a soma dos campos Quantidade
