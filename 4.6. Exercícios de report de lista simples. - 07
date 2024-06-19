@@ -9,8 +9,9 @@ REPORT zreport_7.
 *o campo Fornecimento como seleção múltipla e Itinerário como seleção múltipla. Seus
 *tipos se encontram na tabela LIKP.
 
-TABLES: likp, "Tabela Transparente - Fornecimento: Dados de Cabeçalho
-        lips. "Tabela Transparente - Documento SD: Fornecimento: Dados de Item
+TABLES: likp,  "Tabela Transparente - Fornecimento: Dados de Cabeçalho
+        lips,  "Tabela Transparente - Documento SD: Fornecimento: Dados de Item
+        tvrot. "Itinerários: Textos
 
 "------------------
 "Tela de Seleção
@@ -23,7 +24,7 @@ SELECTION-SCREEN END OF BLOCK a1.
 SELECTION-SCREEN SKIP 1.
 
 TYPES: BEGIN OF ty_likp, "Estrutura - Fornecimento: Dados de Cabeçalho
-  autlf TYPE likp-autlf, "Fornecimento
+  vbeln TYPE likp-vbeln, "Fornecimento
   erdat TYPE likp-erdat, "Data de Criação
   route TYPE likp-route, "Itinerário
 END OF ty_likp.
@@ -39,7 +40,7 @@ DATA: t_likp  TYPE TABLE OF ty_likp, "Tabela Interna - Estrutura - Fornecimento:
 *filtrado pelo campo Itinerário da tela de seleção, retornando os campos Fornecimento,
 *Data de criação do registro e Itinerário.
 
-SELECT autlf, "Selecione Fornecimento
+SELECT vbeln, "Selecione Fornecimento
        erdat, "Data de Criação
        route  "Itinerário
        FROM likp "Da Tabela Transparente - Fornecimento: Dados de Cabeçalho
@@ -50,27 +51,49 @@ SELECT autlf, "Selecione Fornecimento
        AND route <> ''        "E Itinerário não for vazio
        AND autlf IN @s_autlf  "E Fornecimento estiver no Campo de Múltipla Escolha - Fornecimento
        AND route IN @s_route. "E Itinerário estiver no Campo de Múltipla Escolha - Itinerário
-  
-types: begin of ty_lips,
-  autlf type lips-autlf,
-  posnr type lips-posnr,
-  matnr type lips-matnr,
-  werks type lips-werks,
-  lfimg type lips-lfimg,
-  ntgew type lips-ntgew,
-end of ty_lips.
 
-"Impossível continuar, pois o campo fornecimento não relaciona as duas tabelas nesta BD. -----------------------------------
-  
 *Para cada registro encontrado na tabela LIKP, selecionar os Itens de
 *Fornecimento na tabela LIPS onde o campo Fornecimento relaciona as duas tabelas,
 *retornando os campos Fornecimento, Item de remessa, Nº do material, Centro,
 *Quantidade fornecida de fato em UMV e Peso líquido.
 
+TYPES: BEGIN OF ty_lips, "Estrutura - Documento SD: Fornecimento: Dados de Item
+  vbeln TYPE lips-vbeln, "Entrega/Fornecimento
+  posnr TYPE lips-posnr, "Item de Remessa
+  matnr TYPE lips-matnr, "Nº do Material
+  werks TYPE lips-werks, "Centro
+  lfimg TYPE lips-lfimg, "Quantidade Fornecida de Fato em UMV
+  ntgew TYPE lips-ntgew, "Peso Líquido
+END OF ty_lips.
+
+DATA: t_lips  TYPE TABLE OF ty_lips, "Tabela Interna - Documento SD: Fornecimento: Dados de Item
+      ls_lips TYPE ty_lips.          "Estrutura - Documento SD: Fornecimento: Dados de Item
+
+SELECT vbeln, "Selecione o Entrega/Fornecimento
+       posnr, "Item de Remessa
+       matnr, "Nº do Material
+       werks, "Centro
+       lfimg, "Quantidade Fornecida de Fato em UMV
+       ntgew  "Peso Líquido
+       FROM lips "Da Tabela Transparente - Documento SD: Fornecimento: Dados de Item
+       INTO CORRESPONDING FIELDS OF TABLE @t_lips "Nos campos correspondentes da Tabela Interna - Documento SD: Fornecimento: Dados de Item
+       FOR ALL ENTRIES IN @t_likp "Relacionada com a Tabela Interna - Fornecimento: Dados de Cabeçalho
+       WHERE vbeln = @t_likp-vbeln. "Onde os Fornecedores são os mesmos.
+
+TYPES: BEGIN OF ty_tvrot, "Estrutura - Itinerários: Textos
+  route TYPE tvrot-route, "Itinerário
+  bezei TYPE tvrot-bezei, "Denominação do Itinerário
+END OF ty_tvrot.
+
+DATA: t_tvrot  TYPE TABLE OF ty_tvrot, "Tabela Interna - Itinerários: Textos
+      ls_tvrot TYPE ty_tvrot.          "Estrutura - Itinerários: Textos
+
+
 *Para cada registro encontrado na tabela LIKP, selecionar na tabela TVROT as
 *descrições dos Itinerários selecionados desde que estas existam com Código de Idioma
 *‘PT’, onde o campo Itinerário relaciona as duas tabelas, retornando os campos: Itinerário
 *e Denominação do Itinerário.
+
 *Para cada Itinerário (quebra) encontrado na tabela LIKP, o relatório deve exibir
 *seus fornecimentos e itens de fornecimento. No final de cada itinerário deverá ser
 *apresentada uma soma dos campos Quantidade fornecida de fato em UMV e Peso
