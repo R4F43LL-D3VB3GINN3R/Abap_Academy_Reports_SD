@@ -104,7 +104,7 @@ SELECT kunnr, "Selecione Nº Cliente 1
        INTO CORRESPONDING FIELDS OF TABLE @t_kna1 "Nos campos correspondentes da Tabela Interna - Mestre de clientes (Parte Geral)
        FOR ALL ENTRIES IN @t_vbrk "Relacionando com a Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
        WHERE kunnr = @t_vbrk-kunag. "Onde o Nº Cliente 1 é igual ao Pagador
-  
+
 *Para cada registro encontrado na tabela VBRP, selecionar na tabela MAKT a
 *descrição dos materiais onde o campo Nº do material relaciona as duas tabelas e o
 *campo Código de idioma = ‘PT’. Retornar os campos Nº do material e Texto breve de
@@ -127,8 +127,29 @@ SELECT matnr, "Número do Material
        AND matnr = @t_vbrp-matnr. "E os números de materiais são os mesmos.
 
 *Para cada Pagador (quebra) encontrado na tabela VBRK o relatório deve exibir
-*seus Documentos de faturamento e itens do documento de faturamento. No final de cada
-*Documento de Faturamento deverá ser apresentada a soma dos campos Quantidade
+*seus Documentos de faturamento e itens do documento de faturamento.
+
+WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+LOOP AT t_vbrp INTO ls_vbrp.
+  READ TABLE t_vbrk INTO ls_vbrk WITH KEY vbeln = ls_vbrp-vbeln.
+    WRITE: / 'Documento de Faturamento: ', ls_vbrk-vbeln.
+    WRITE: / 'Emitido em: ', ls_vbrk-fkdat.
+    WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+    WRITE: / 'Item do Documento de Faturamento: ', ls_vbrp-posnr.
+    LOOP AT t_vbrk INTO ls_vbrk.
+      WRITE: / 'Quantidade Faturada: ', ls_vbrp-fkimg.
+      WRITE: / 'Peso Bruto: ', ls_vbrp-brgew.
+      WRITE: / 'Peso Líquido: ', ls_vbrp-ntgew.
+      WRITE: / 'Valor Líquido: ', ls_vbrp-netwr.
+      WRITE: / 'Número do Material: ', ls_vbrp-matnr.
+      WRITE: / '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'.
+    ENDLOOP.
+
+
+
+ENDLOOP.
+
+*No final de cada documento de Faturamento deverá ser apresentada a soma dos campos Quantidade
 *faturada efetivamente, Peso líquido, Peso bruto, Valor líquido do item de faturamento em
 *moeda do documento. No final de cada Pagador também deverá ser apresentada a
 *soma dos campos Quantidade faturada efetivamente, Peso líquido, Peso bruto, Valor
