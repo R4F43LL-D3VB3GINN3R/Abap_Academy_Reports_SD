@@ -10,7 +10,8 @@ REPORT zreport_alv_2.
 
 TABLES: vbak, "Tabela Transparente - Documento de Vendas: Dados de Cabeçalho
         vbap, "Tabela Trasparente - Documento de Vendas: Dados de Item
-        lips. "Documento SD: Fornecimento: Dados de Item
+        lips, "Documento SD: Fornecimento: Dados de Item
+        kna1. "Mestre de Clientes (Parte Geral)
 
 "---------------
 "TELA DE SELEÇÃO
@@ -54,7 +55,7 @@ SELECTION-SCREEN SKIP 1.
         ls_vbap TYPE ty_vbap.          "Estrutura - Estrutura - Documento de Vendas: Dados de Item
 
    "-----------------------
-   
+
   TYPES: BEGIN OF ty_lips, "Estrutura - Documento SD: Fornecimento: Dados de Item
     vbeln TYPE lips-vbeln, "Documento de Vendas
     posnr TYPE lips-posnr, "Item do Documento de Vendas
@@ -64,6 +65,16 @@ SELECTION-SCREEN SKIP 1.
 
   DATA: t_lips  TYPE TABLE OF ty_lips, "Tabela Interna - Estrutura - Documento SD: Fornecimento: Dados de Item
         ls_lips TYPE ty_lips.          "Estrutura - Estrutura - Documento SD: Fornecimento: Dados de Item
+
+  "-----------------------
+  
+  TYPES: BEGIN OF ty_kna1, "Estrutura - Mestre de Clientes (Parte Geral)
+    kunnr TYPE kna1-kunnr, "Nº do Cliente
+    name1 TYPE kna1-name1, "Nome do Cliente
+  END OF ty_kna1.
+
+  DATA: t_kna1  TYPE TABLE OF ty_kna1, "Tabela Interna - Estrutura - Mestre de Clientes (Parte Geral)
+        ls_kna1 TYPE ty_kna1.          "Estrutura - Estrutura - Mestre de Clientes (Parte Geral)
   
   "-----------------------
 
@@ -75,6 +86,7 @@ START-OF-SELECTION.
   PERFORM get_sales_doc.
   PERFORM get_data_item.
   PERFORM get_data_delivery.
+  PERFORM get_client.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -171,5 +183,34 @@ FORM get_data_delivery .
          WHERE vgbel = @t_vbap-vbeln "Onde fazem parte do mesmo Documento de Vendas
          AND vgpos = @t_vbap-posnr "E são igualmente os mesmos Itens do Documento de Vendas
          AND pstyv = 'TAN'. "E o Tipo de Item de Remessa for padrão."
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_client
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_client .
+
+*Selecionar na tabela KNA1 os campos KUNNR e NAME1, relacionados com
+*T_VBAK, onde KNA1-KUNNR = T_VBAK-KUNNR.
+
+*+-------------+     +-------------+
+*|   VBAK      |     |   KNA1      |
+*+-------------+     +-------------+
+*| VBELN (PK)  |     | KUNNR (PK)  |
+*| KUNNR (FK)  |<--->| ...         |
+*| ...         |     +-------------+
+*+-------------+
+
+  SELECT kunnr, "Nº do Cliente
+         name1  "Nome do Cliente
+         FROM kna1 "Da Tabela Transparente - Mestre de Clientes (Parte Geral)
+         INTO CORRESPONDING FIELDS OF TABLE @t_kna1 "Nos campos correspondentes da Tabela Interna - Mestre de Clientes (Parte Geral)
+         FOR ALL ENTRIES IN @t_vbak   "Relacionado à Tabela Interna - Documento de Vendas: Dados de Cabeçalho
+         WHERE kunnr = @t_vbak-kunnr. "Onde os Números do Cliente são os mesmos.
 
 ENDFORM.
