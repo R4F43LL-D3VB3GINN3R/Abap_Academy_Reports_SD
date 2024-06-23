@@ -1,0 +1,120 @@
+*&---------------------------------------------------------------------*
+*& Report ZREPORT_ALV_2
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zreport_alv_2.
+
+*Criar um relatório do tipo ALV com o título (Relatório de Ordens de Venda em
+*Moeda EURO), conforme descrito abaixo:
+
+TABLES: vbak, "Tabela Transparente - Documento de Vendas: Dados de Cabeçalho
+        vbap, "Tabela Trasparente - Documento de Vendas: Dados de Item
+        lips. "Documento SD: Fornecimento: Dados de Item
+
+"---------------
+"TELA DE SELEÇÃO
+"---------------
+
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
+  SELECT-OPTIONS: s_vbeln FOR vbak-vbeln, "Documento de Vendas
+                  s_erdat FOR vbak-erdat, "Data de Criação do Registro
+                  s_kunnr FOR vbak-kunnr. "Emissor da Ordem
+SELECTION-SCREEN END OF BLOCK a1.
+SELECTION-SCREEN SKIP 1.
+
+"-------------------------------------------------------------------------------------------------------------------"
+"-------------------------------------------------------------------------------------------------------------------"
+"-------------------------------------------------------------------------------------------------------------------"
+"Variáveis - Estruturas - Tabelas
+
+  "-----------------------
+
+  TYPES: BEGIN OF ty_vbak, "Estrutura - Documento de Vendas: Dados de Cabeçalho
+    vbeln TYPE vbak-vbeln, "Documento de Vendas
+    erdat TYPE vbak-erdat, "Data de Criação do Registro
+    netwr TYPE vbak-netwr, "Valor Líquido da Ordem na Moeda do Documento
+    kunnr TYPE vbak-kunnr, "Emissor da Ordem
+  END OF ty_vbak.
+
+  DATA: t_vbak  TYPE TABLE OF ty_vbak, "Tabela Interna - Estrutura - Documento de Vendas: Dados de Cabeçalho
+        ls_vbak TYPE ty_vbak.          "Estrutura - Estrutura - Documento de Vendas: Dados de Cabeçalho
+
+  "-----------------------
+
+  TYPES: BEGIN OF ty_vbap, "Estrutura - Documento de Vendas: Dados de Item
+    vbeln TYPE vbap-vbeln, "Documento de Vendas
+    posnr TYPE vbap-posnr, "Item do Documento de Vendas
+    matnr TYPE vbap-matnr, "Número do Material
+    gsber TYPE vbap-gsber, "Divisão.
+  END OF ty_vbap.
+
+  DATA: t_vbap  TYPE TABLE OF ty_vbap, "Tabela Interna - Estrutura - Documento de Vendas: Dados de Item
+        ls_vbap TYPE ty_vbap.          "Estrutura - Estrutura - Documento de Vendas: Dados de Item
+
+   "-----------------------
+
+"-------------------------------------------------------------------------------------------------------------------"
+"-------------------------------------------------------------------------------------------------------------------"
+"-------------------------------------------------------------------------------------------------------------------"
+
+START-OF-SELECTION.
+  PERFORM get_sales_doc.
+  PERFORM get_data_item.
+  perform get_data_delivery.
+END-OF-SELECTION.
+
+*&---------------------------------------------------------------------*
+*& Form get_sales_doc
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_sales_doc.
+
+*Selecionar na tabela VBAK os campos VBELN, ERDAT, NETWR e KUNNR, onde
+*VBAK-VBELN IN S_VBELN e VBAK-ERDAT IN S_ERDAT e VBAK-KUNNR IN
+*S_KUNNR e VBAK-AUART = ‘TA’ e VBAK-WAERK = ‘EUR’. Para testes preencher o
+*parâmetro S_ERDAT o período de 01.01.2008 a 31.12.2008. Armazenar registros na
+*tabela interna T_VBAK.
+
+  SELECT vbeln, "Selecione o Documento de Vendas
+         erdat, "Data de Criação do Registro
+         netwr, "Valor Líquido da Ordem na Moeda do Documento
+         kunnr  "Emissor da Ordem
+         FROM vbak "Da Tabela Transparente - Documento de Vendas: Dados de Cabeçalho
+         INTO CORRESPONDING FIELDS OF TABLE @t_vbak "Nos campos correspondentes da Tabela Interna - Documento de Vendas: Dados de Cabeçalho
+         WHERE vbeln IN @s_vbeln "Onde o Documento de Vendas está no range do campo de múltipla escolha
+         AND erdat IN @s_erdat "E a Data de Criação do Registro está no range do campo de múltipla escolha
+         AND kunnr IN @s_kunnr "E o Emissor da Ordem está no range do campo de múltipla escolha
+         AND auart = 'TA' "E o Tipo de Documento de Vendas  é 'TA'
+         AND waerk = 'EUR'. "E a Moeda do Documento for Euro.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_data_item
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_data_item .
+
+*Selecionar na tabela VBAP os campos VBELN, POSNR, MATNR e GSBER,
+*relacionados com T_VBAK, onde VBAP-VBELN = T_VBAK-VBELN. Armazenar registros
+*na tabela interna T_VBAP.
+
+  SELECT vbeln, "Selecione o Documento de Vendas
+         posnr, "Item do Documento de Vendas
+         matnr, "Número do Material
+         gsber  "Divisão
+         FROM vbap "Da Tabela Transparente - Documento de Vendas: Dados de Item
+         INTO CORRESPONDING FIELDS OF TABLE @t_vbap "Nos campos correspondentes da Tabela Interna - Documento de Vendas: Dados de Item
+         FOR ALL ENTRIES IN @t_vbak "Relacionada com a Tabela Interna - Documento de Vendas: Dados de Cabeçalho
+         WHERE vbeln = @t_vbak-vbeln. "Onde o Documento de Vendas é o mesmo.
+
+ENDFORM.
