@@ -54,6 +54,18 @@ SELECTION-SCREEN SKIP 1.
         ls_vbap TYPE ty_vbap.          "Estrutura - Estrutura - Documento de Vendas: Dados de Item
 
    "-----------------------
+   
+  TYPES: BEGIN OF ty_lips, "Estrutura - Documento SD: Fornecimento: Dados de Item
+    vbeln TYPE lips-vbeln, "Documento de Vendas
+    posnr TYPE lips-posnr, "Item do Documento de Vendas
+    vgbel TYPE lips-vgbel, "Nº Documento do Documento de Referência
+    vgpos TYPE lips-vgpos, "Nº Item do Item Comercial Modelo
+  END OF ty_lips.
+
+  DATA: t_lips  TYPE TABLE OF ty_lips, "Tabela Interna - Estrutura - Documento SD: Fornecimento: Dados de Item
+        ls_lips TYPE ty_lips.          "Estrutura - Estrutura - Documento SD: Fornecimento: Dados de Item
+  
+  "-----------------------
 
 "-------------------------------------------------------------------------------------------------------------------"
 "-------------------------------------------------------------------------------------------------------------------"
@@ -62,7 +74,7 @@ SELECTION-SCREEN SKIP 1.
 START-OF-SELECTION.
   PERFORM get_sales_doc.
   PERFORM get_data_item.
-  perform get_data_delivery.
+  PERFORM get_data_delivery.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -108,6 +120,14 @@ FORM get_data_item .
 *relacionados com T_VBAK, onde VBAP-VBELN = T_VBAK-VBELN. Armazenar registros
 *na tabela interna T_VBAP.
 
+*+-------------+     +--------------+
+*|   VBAK      |     |   VBAP       |
+*+-------------+     +--------------+
+*| VBELN (PK)  |<--->| VBELN (FK,PK)|
+*| ...         |     | POSNR (PK)   |
+*+-------------+     | ...          |
+*                    +--------------+
+
   SELECT vbeln, "Selecione o Documento de Vendas
          posnr, "Item do Documento de Vendas
          matnr, "Número do Material
@@ -116,5 +136,40 @@ FORM get_data_item .
          INTO CORRESPONDING FIELDS OF TABLE @t_vbap "Nos campos correspondentes da Tabela Interna - Documento de Vendas: Dados de Item
          FOR ALL ENTRIES IN @t_vbak "Relacionada com a Tabela Interna - Documento de Vendas: Dados de Cabeçalho
          WHERE vbeln = @t_vbak-vbeln. "Onde o Documento de Vendas é o mesmo.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_data_delivery
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_data_delivery .
+
+*Selecionar na tabela LIPS os campos VBELN, POSNR, VGBEL e VGPOS,
+*relacionados com T_VBAP, onde LIPS-VGBEL = T_VBAP-VBELN e LIPS-VGPOS =
+*T_VBAP-POSNR e LIPS-PSTYV = ‘TAN’. Armazenar registros na tabela interna T_LIPS.
+
+*+-------------+     +-------------+      +-------------+
+*|   VBAK      |     |   VBAP      |      |   LIPS      |
+*+-------------+     +-------------+      +-------------+
+*| VBELN (PK)  |<--->| VBELN (FK,PK)|<--->| VBELN (PK)  |
+*| ...         |     | POSNR (PK)  |      | ...         |
+*+-------------+     | ...         |      | VGBEL (FK)  |
+*                    +-------------+      | VGPOS (FK)  |
+*                                         +-------------+
+
+  SELECT vbeln, "Selecione o Documento de Vendas
+         posnr, "Item do Documento de Vendas
+         vgbel, "Nº Documento do Documento de Referência
+         vgpos  "Nº Item do Item Comercial Modelo
+         FROM lips "Da Tabela Transparente - Documento SD: Fornecimento: Dados de Item
+         INTO CORRESPONDING FIELDS OF TABLE @t_lips "Nos Campos correspondentes da Tabela Interna - Documento SD: Fornecimento: Dados de Item
+         FOR ALL ENTRIES IN @t_vbap "Relacionado à Tabela Interna - Documento de Vendas: Dados de Item
+         WHERE vgbel = @t_vbap-vbeln "Onde fazem parte do mesmo Documento de Vendas
+         AND vgpos = @t_vbap-posnr "E são igualmente os mesmos Itens do Documento de Vendas
+         AND pstyv = 'TAN'. "E o Tipo de Item de Remessa for padrão."
 
 ENDFORM.
