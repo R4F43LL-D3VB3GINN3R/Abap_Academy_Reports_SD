@@ -8,11 +8,12 @@ REPORT zreport_alv_2.
 *Criar um relatório do tipo ALV com o título (Relatório de Ordens de Venda em
 *Moeda EURO), conforme descrito abaixo:
 
-TABLES: vbak, "Tabela Transparente - Documento de Vendas: Dados de Cabeçalho
-        vbap, "Tabela Transparente - Documento de Vendas: Dados de Item
-        lips, "Tabela Transparente - Documento SD: Fornecimento: Dados de Item
-        kna1, "Tabela Transparente - Mestre de Clientes (Parte Geral)
-        makt. "Tabela Transparente - Textos Breves de Material
+TABLES: vbak,  "Tabela Transparente - Documento de Vendas: Dados de Cabeçalho
+        vbap,  "Tabela Transparente - Documento de Vendas: Dados de Item
+        lips,  "Tabela Transparente - Documento SD: Fornecimento: Dados de Item
+        kna1,  "Tabela Transparente - Mestre de Clientes (Parte Geral)
+        makt,  "Tabela Transparente - Textos Breves de Material
+        tgsbt. "Tabela Transparente - Denominação das Divisões da Empresa
 
 "---------------
 "TELA DE SELEÇÃO
@@ -78,7 +79,7 @@ SELECTION-SCREEN SKIP 1.
         ls_kna1 TYPE ty_kna1.          "Estrutura - Estrutura - Mestre de Clientes (Parte Geral)
 
   "-----------------------
-  
+
   TYPES: BEGIN OF ty_makt, "Estrutura - Textos Breves de Material
     matnr TYPE makt-matnr, "Número do Material
     maktx TYPE makt-maktx, "Texto Breve de Material
@@ -86,7 +87,17 @@ SELECTION-SCREEN SKIP 1.
 
   DATA: t_makt  TYPE TABLE OF ty_makt, "Tabela Interna- Estrutura - Textos Breves de Material
         ls_makt TYPE ty_makt.          "Estrutura - Estrutura - Textos Breves de Material
-  
+
+  "-----------------------
+
+  TYPES: BEGIN OF ty_tgsbt, "Estrutura - Denominação das Divisões da Empresa
+    gsber TYPE tgsbt-gsber, "Divisão
+    gtext TYPE tgsbt-gtext, "Denominação da Divisão
+  END OF ty_tgsbt.
+
+  DATA: t_tgsbt  TYPE TABLE OF ty_tgsbt, "Tabela Interna - Estrutura - Denominação das Divisões da Empresa
+        ls_tgsbt TYPE ty_tgsbt.          "Estrutura - Estrutura - Denominação das Divisões da Empresa
+
   "-----------------------
 
 "-------------------------------------------------------------------------------------------------------------------"
@@ -99,6 +110,7 @@ START-OF-SELECTION.
   PERFORM get_data_delivery.
   PERFORM get_client.
   PERFORM get_text_item.
+  PERFORM get_division_text.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -256,5 +268,36 @@ FORM get_text_item .
          FOR ALL ENTRIES IN @t_vbap "Relacionado à Tabela Interna - Documento de Vendas: Dados de Item
          WHERE matnr = @t_vbap-matnr "Onde os Números de Materiais são os mesmos
          AND spras = @sy-langu. "E onde o idioma for o mesmo do user logado no sistema.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_division_text
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_division_text .
+
+*Selecionar na tabela TGSBT os campos GSBER e GTEXT, relacionados com
+*T_VBAP, onde TGSBT-GSBER = T_VBAP-GSBER e SPRAS = SY-LANGU.
+
+*+-------------+        +--------------+
+*|    TGSBT    |        |     VBAP     |
+*+-------------+        +--------------+
+*|   GSBER (PK)| 1    N |   GSBER (FK) |
+*|   GSBEZ     |--------|   VBELN (PK) |
+*|   ...       |        |   POSNR (PK) |
+*+-------------+        |   SPRAS      |
+*                       +--------------+
+
+  SELECT gsber, "Selecione Divisão
+         gtext  "Denominação da Divisão
+         FROM tgsbt "Da Tabela Transparente - Denominação das Divisões da Empresa
+         INTO CORRESPONDING FIELDS OF TABLE @t_tgsbt "Nos campos correspondentes da Tabela Interna - Denominação das Divisões da Empresa
+         FOR ALL ENTRIES IN @t_vbap "Relacionado à Tabela Interna - Documento de Vendas: Dados de Item
+         WHERE gsber = @t_vbap-gsber. "Onde o material pertence à unidade da empresa.
+         "AND spras = @sy-langu. "E onde o idioma for o mesmo do user logado no sistema.
 
 ENDFORM.
