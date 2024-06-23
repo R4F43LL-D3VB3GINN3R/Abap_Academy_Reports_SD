@@ -9,9 +9,10 @@ REPORT zreport_alv_2.
 *Moeda EURO), conforme descrito abaixo:
 
 TABLES: vbak, "Tabela Transparente - Documento de Vendas: Dados de Cabeçalho
-        vbap, "Tabela Trasparente - Documento de Vendas: Dados de Item
-        lips, "Documento SD: Fornecimento: Dados de Item
-        kna1. "Mestre de Clientes (Parte Geral)
+        vbap, "Tabela Transparente - Documento de Vendas: Dados de Item
+        lips, "Tabela Transparente - Documento SD: Fornecimento: Dados de Item
+        kna1, "Tabela Transparente - Mestre de Clientes (Parte Geral)
+        makt. "Tabela Transparente - Textos Breves de Material
 
 "---------------
 "TELA DE SELEÇÃO
@@ -67,7 +68,7 @@ SELECTION-SCREEN SKIP 1.
         ls_lips TYPE ty_lips.          "Estrutura - Estrutura - Documento SD: Fornecimento: Dados de Item
 
   "-----------------------
-  
+
   TYPES: BEGIN OF ty_kna1, "Estrutura - Mestre de Clientes (Parte Geral)
     kunnr TYPE kna1-kunnr, "Nº do Cliente
     name1 TYPE kna1-name1, "Nome do Cliente
@@ -75,6 +76,16 @@ SELECTION-SCREEN SKIP 1.
 
   DATA: t_kna1  TYPE TABLE OF ty_kna1, "Tabela Interna - Estrutura - Mestre de Clientes (Parte Geral)
         ls_kna1 TYPE ty_kna1.          "Estrutura - Estrutura - Mestre de Clientes (Parte Geral)
+
+  "-----------------------
+  
+  TYPES: BEGIN OF ty_makt, "Estrutura - Textos Breves de Material
+    matnr TYPE makt-matnr, "Número do Material
+    maktx TYPE makt-maktx, "Texto Breve de Material
+  END OF ty_makt.
+
+  DATA: t_makt  TYPE TABLE OF ty_makt, "Tabela Interna- Estrutura - Textos Breves de Material
+        ls_makt TYPE ty_makt.          "Estrutura - Estrutura - Textos Breves de Material
   
   "-----------------------
 
@@ -87,6 +98,7 @@ START-OF-SELECTION.
   PERFORM get_data_item.
   PERFORM get_data_delivery.
   PERFORM get_client.
+  PERFORM get_text_item.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -212,5 +224,37 @@ FORM get_client .
          INTO CORRESPONDING FIELDS OF TABLE @t_kna1 "Nos campos correspondentes da Tabela Interna - Mestre de Clientes (Parte Geral)
          FOR ALL ENTRIES IN @t_vbak   "Relacionado à Tabela Interna - Documento de Vendas: Dados de Cabeçalho
          WHERE kunnr = @t_vbak-kunnr. "Onde os Números do Cliente são os mesmos.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_text_item
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_text_item .
+
+*Selecionar na tabela MAKT os campos MATNR e MAKTX, relacionados com
+*T_VBAP, onde MAKT-MATNR = T_VBAP-MATNR e SPRAS = SY-LANGU. Armazenar
+*registros na tabela interna T_MAKT.
+
+*+-------------+     +-------------+
+*|   MAKT      |     |   VBAP      |
+*+-------------+     +-------------+
+*| MATNR (PK)  |<--->| MATNR (FK)  |
+*| MAKTX       |     | VBELN (PK)  |
+*| ...         |     | POSNR (PK)  |
+*+-------------+     | ...         |
+*                    +-------------+
+
+  SELECT matnr, "Selecione o Número do Material
+         maktx  "Texto Breve de Material
+         FROM makt "Da Tabela Transparente - Textos Breves de Material
+         INTO CORRESPONDING FIELDS OF TABLE @t_makt "Nos campos correspondentes da Tabela Interna - Textos Breves de Material
+         FOR ALL ENTRIES IN @t_vbap "Relacionado à Tabela Interna - Documento de Vendas: Dados de Item
+         WHERE matnr = @t_vbap-matnr "Onde os Números de Materiais são os mesmos
+         AND spras = @sy-langu. "E onde o idioma for o mesmo do user logado no sistema.
 
 ENDFORM.
