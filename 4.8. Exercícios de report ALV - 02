@@ -100,6 +100,26 @@ SELECTION-SCREEN SKIP 1.
 
   "-----------------------
 
+  TYPES: BEGIN OF ty_output, "Estrutura - Tabela de Saída
+    vbeln TYPE vbak-vbeln,   "Documento de Vendas -                          [Documento de Vendas: Dados de Cabeçalho]
+    erdat TYPE vbak-erdat,   "Data de Criação do Registro -                  [Documento de Vendas: Dados de Cabeçalho]
+    netwr TYPE vbak-netwr,   "Valor Líquido da Ordem na Moeda do Documento - [Documento de Vendas: Dados de Cabeçalho]
+    kunnr TYPE vbak-kunnr,   "Emissor da Ordem -                             [Documento de Vendas: Dados de Cabeçalho]
+    posnr TYPE vbap-posnr,   "Item do Documento de Vendas -                  [Documento de Vendas: Dados de Item]
+    matnr TYPE vbap-matnr,   "Número do Material -                           [Documento de Vendas: Dados de Item]
+    gsber TYPE vbap-gsber,   "Divisão -                                      [Documento de Vendas: Dados de Item]
+    vgbel TYPE lips-vgbel,   "Nº Documento do Documento de Referência -      [Documento SD: Fornecimento: Dados de Item]
+    vgpos TYPE lips-vgpos,   "Nº Item do Item Comercial Modelo -             [Documento SD: Fornecimento: Dados de Item]
+    name1 TYPE kna1-name1,   "Nome do Cliente -                              [Mestre de Clientes (Parte Geral)]
+    maktx TYPE makt-maktx,   "Texto Breve de Material -                      [Textos Breves de Material]
+    gtext TYPE tgsbt-gtext,  "Denominação da Divisão -                       [Denominação das Divisões da Empresa]
+  END OF ty_output.
+
+  DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Estrutura - Tabela de Saída
+        ls_output TYPE ty_output.          "Estrutura - Estrutura - Tabela de Saída
+
+  "-----------------------
+
 "-------------------------------------------------------------------------------------------------------------------"
 "-------------------------------------------------------------------------------------------------------------------"
 "-------------------------------------------------------------------------------------------------------------------"
@@ -111,6 +131,7 @@ START-OF-SELECTION.
   PERFORM get_client.
   PERFORM get_text_item.
   PERFORM get_division_text.
+  PERFORM data_processing.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -299,5 +320,41 @@ FORM get_division_text .
          FOR ALL ENTRIES IN @t_vbap "Relacionado à Tabela Interna - Documento de Vendas: Dados de Item
          WHERE gsber = @t_vbap-gsber. "Onde o material pertence à unidade da empresa.
          "AND spras = @sy-langu. "E onde o idioma for o mesmo do user logado no sistema.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form data_processing
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM data_processing .
+
+*Processamento:
+
+*Dar um loop na tabela interna T_VBAP.
+
+  loop at t_vbap into ls_vbap.
+    
+*  Ler a tabela interna T_VBAK, onde T_VBAP-VBELN = T_VBAK-VBELN. 
+*  Se não encontrar o registro, ler o próximo da tabela interna T_VBAP.
+   
+   read table t_vbak into ls_vbak with key vbeln = 
+    
+  endloop.
+
+*Ler a tabela interna T_KNA1, onde T_KNA1-KUNNR = T_VBAK-KUNNR. Se não
+*encontrar o registro, ler o próximo da tabela interna T_VBAP.
+*Ler a tabela interna T_LIPS, onde T_LIPS-VGBEL = T_VBAP-VBELN e T_LIPSVGPOS = T_VBAP-POSNR.
+"Se não encontrar o registro, ler o próximo da tabela interna T_VBAP.
+*Ler a tabela interna T_MAKT, onde T_VBAP-MATNR = T_MAKT-MATNR. Se não
+*encontrar o registro, ler o próximo da tabela interna T_VBAP.
+*Ler a tabela interna T_TGSBT, onde T_TGSBT-GSBER = T_VBAP-GSBER. Se
+*não encontrar o registro, ler o próximo da tabela interna T_VBAP.
+*Montar a tabela interna de saída.
+
+  
 
 ENDFORM.
