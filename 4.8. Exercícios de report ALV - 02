@@ -395,6 +395,9 @@ FORM data_processing .
       ls_output-vbeln = ls_vbak-vbeln. "Documento de Vendas
       ls_output-erdat = ls_vbak-erdat. "Data de Criação do Registro
       ls_output-netwr = ls_vbak-netwr. "Valor Líquido da Ordem na Moeda do Documento
+      
+*     *O campo STATUS deverá ser preenchido com semáforo vermelho se NETWR <=
+*     *20000, amarelo se NETWR > 20000 e NETWR <= 40000 e verde se NETWR > 40000.
 
       IF ls_output-netwr <= 20000.
         ls_output-status = icon_led_red.
@@ -453,22 +456,9 @@ FORM data_processing .
     CONCATENATE ls_output-gsber ls_output-gtext INTO ls_output-gsber_gtext SEPARATED BY ' - '.
     CONCATENATE ls_output-matnr ls_output-maktx INTO ls_output-matnr_maktx SEPARATED BY ' - '.
 
-*    " Determine status for NETWR
-*    IF ls_output-netwr <= 1000.
-*      ls_output-status-color-col = 'C11111'.
-*      ls_output-status-icon = '@1P@'.
-*    ELSEIF ls_output-netwr > 1000 AND ls_output-netwr <= 5000.
-*      ls_output-status-color-col = 'C1A300'.
-*      ls_output-status-icon = '@1E@'.
-*    ELSE.
-*      ls_output-status-color-col = 'C1B9B5'.
-*      ls_output-status-icon = '@1G@'.
-*    ENDIF.
-
     APPEND ls_output TO t_output.
   ENDLOOP.
 
-WRITE 'a'.
 ENDFORM.
 *&---------------------------------------------------------------------*
 *& Form display_data
@@ -480,6 +470,11 @@ ENDFORM.
 *&---------------------------------------------------------------------*
 FORM build_field_catalog USING pt_fieldcat TYPE slis_t_fieldcat_alv.
   DATA: ls_fieldcat TYPE slis_fieldcat_alv.
+  
+*Layout do Relatório:
+*O relatório deverá imprimir os campos conforme regras abaixo:
+  
+* *O campo VBELN(VBAK) deverá possui HOTSPOT conforme parâmetros abaixo:
 
   CLEAR wa_fieldcat.
   wa_fieldcat-col_pos = 1.
@@ -511,6 +506,8 @@ FORM build_field_catalog USING pt_fieldcat TYPE slis_t_fieldcat_alv.
   wa_fieldcat-outputlen = 12.
   APPEND wa_fieldcat TO it_fieldcat.
 
+*  *Efetuar quebra pelos campos da tabela de saída ERDAT KUNNR/NAME1 
+  
   CLEAR wa_fieldcat.
   wa_fieldcat-col_pos = 4.
   wa_fieldcat-fieldname = 'kunnr_name1'.
@@ -519,6 +516,8 @@ FORM build_field_catalog USING pt_fieldcat TYPE slis_t_fieldcat_alv.
   wa_fieldcat-just = 'C'.
   wa_fieldcat-outputlen = 24.
   APPEND wa_fieldcat TO it_fieldcat.
+  
+* *O campo NETWR deverá possuir somatória.
 
   CLEAR wa_fieldcat.
   wa_fieldcat-col_pos = 5.
@@ -539,6 +538,8 @@ FORM build_field_catalog USING pt_fieldcat TYPE slis_t_fieldcat_alv.
   wa_fieldcat-outputlen = 34.
   APPEND wa_fieldcat TO it_fieldcat.
 
+* *O campo VBELN(LIPS) deverá possui HOTSPOT conforme parâmetros abaixo:
+
   CLEAR wa_fieldcat.
   wa_fieldcat-col_pos = 7.
   wa_fieldcat-fieldname = 'vgbel'.
@@ -548,6 +549,8 @@ FORM build_field_catalog USING pt_fieldcat TYPE slis_t_fieldcat_alv.
   wa_fieldcat-hotspot = 'X'.
   wa_fieldcat-outputlen = 10.
   APPEND wa_fieldcat TO it_fieldcat.
+  
+* *GSBER/GTEXT. (resultado da concatenação)
 
   CLEAR wa_fieldcat.
   wa_fieldcat-col_pos = 8.
@@ -572,24 +575,6 @@ ENDFORM.
 FORM display_data .
 
   PERFORM build_field_catalog USING it_fieldcat.
-
-*Layout do Relatório:
-*O relatório deverá imprimir os campos conforme regras abaixo:
-*Efetuar quebra pelos campos da tabela de saída ERDAT KUNNR/NAME1 e
-*GSBER/GTEXT. (resultado da concatenação)
-
-*O campo NETWR deverá possuir somatória.
-
-*O campo VBELN(VBAK) deverá possui HOTSPOT conforme parâmetros abaixo:
-*SET PARAMETER ID ‘AUN’ FIELD SELFIELD-VALUE.
-*CALL TRANSACTION ‘VA03’ AND SKIP FIRST SCREEN.
-
-*O campo VBELN(LIPS) deverá possui HOTSPOT conforme parâmetros abaixo:
-*SET PARAMETER ID ‘VL’ FIELD SELFIELD-VALUE.
-*CALL TRANSACTION ‘VL03N’ AND SKIP FIRST SCREEN.
-
-*O campo STATUS deverá ser preenchido com semáforo vermelho se NETWR <=
-*20000, amarelo se NETWR > 20000 e NETWR <= 40000 e verde se NETWR > 40000.
 
 *Criar 2 botões, um para geração do arquivo TXT e outro do arquivo CSV das
 *linhas selecionadas no relatório.
@@ -630,7 +615,7 @@ FORM user_command USING r_ucomm LIKE sy-ucomm
 *      READ TABLE t_output INDEX rs_selfield-tabindex INTO ls_output.
 *      IF sy-subrc = 0.
 *        CASE rs_selfield-fieldname.
-*          WHEN 'VBAK'.
+*          WHEN 'VBELN'.
 *            SET PARAMETER ID 'AUN' FIELD ls_output-vbeln.
 *            CALL TRANSACTION 'VA03' AND SKIP FIRST SCREEN.
 *          WHEN 'VGBEL'.
@@ -644,16 +629,18 @@ FORM user_command USING r_ucomm LIKE sy-ucomm
 *      PERFORM export_to_csv.
 *  ENDCASE.
 
+*SET PARAMETER ID ‘AUN’ FIELD SELFIELD-VALUE.
+*CALL TRANSACTION ‘VA03’ AND SKIP FIRST SCREEN.
+
+*SET PARAMETER ID ‘VL’ FIELD SELFIELD-VALUE.
+*CALL TRANSACTION ‘VL03N’ AND SKIP FIRST SCREEN.
+
 CASE r_ucomm.
     WHEN '&IC1'. " Este é o comando padrão para hotspots
       READ TABLE t_output INDEX rs_selfield-tabindex INTO ls_output.
       IF sy-subrc = 0.
         PERFORM call_transaction USING ls_output-vbeln.
       ENDIF.
-    WHEN 'EXPORT_TXT'.
-      PERFORM export_to_txt.
-    WHEN 'EXPORT_CSV'.
-      PERFORM export_to_csv.
   ENDCASE.
 
 ENDFORM.
@@ -671,38 +658,4 @@ FORM call_transaction USING p_vbeln TYPE vbak-vbeln.
   " Chama a transação SE16N com o comando montado
   CALL TRANSACTION 'VA03' AND SKIP FIRST SCREEN.
 
-ENDFORM.
-FORM export_to_txt.
-  DATA: lv_filename TYPE string,
-        lv_file TYPE string.
-
-  lv_filename = '/tmp/relatorio.txt'.
-  OPEN DATASET lv_filename FOR OUTPUT IN TEXT MODE ENCODING DEFAULT.
-  LOOP AT t_output INTO ls_output.
-    lv_file = ls_output-erdat && ' ' && ls_output-kunnr && ' ' && ls_output-name1 &&
-              ' ' && ls_output-gsber && ' ' && ls_output-gtext && ' ' &&
-              ls_output-vbeln && ' ' && ls_output-vbeln && ' ' &&
-              ls_output-netwr && ' ' && ls_output-status.
-    TRANSFER lv_file TO lv_filename.
-  ENDLOOP.
-  CLOSE DATASET lv_filename.
-  MESSAGE 'Arquivo TXT exportado com sucesso' TYPE 'I'.
-ENDFORM.
-
-* Função para exportar dados para CSV
-FORM export_to_csv.
-  DATA: lv_filename TYPE string,
-        lv_file TYPE string.
-
-  lv_filename = '/tmp/relatorio.csv'.
-  OPEN DATASET lv_filename FOR OUTPUT IN TEXT MODE ENCODING DEFAULT.
-  LOOP AT t_output INTO ls_output.
-    lv_file = ls_output-erdat && ',' && ls_output-kunnr && ',' && ls_output-name1 &&
-              ',' && ls_output-gsber && ',' && ls_output-gtext && ',' &&
-              ls_output-vbeln && ',' && ls_output-vbeln && ',' &&
-              ls_output-netwr && ',' && ls_output-status.
-    TRANSFER lv_file TO lv_filename.
-  ENDLOOP.
-  CLOSE DATASET lv_filename.
-  MESSAGE 'Arquivo CSV exportado com sucesso' TYPE 'I'.
 ENDFORM.
