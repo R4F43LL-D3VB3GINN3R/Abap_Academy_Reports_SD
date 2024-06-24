@@ -41,8 +41,8 @@ SELECTION-SCREEN SKIP 1.
     kunnr TYPE vbak-kunnr, "Emissor da Ordem
   END OF ty_vbak.
 
-  DATA: t_vbak  TYPE TABLE OF ty_vbak, "Tabela Interna - Estrutura - Documento de Vendas: Dados de Cabeçalho
-        ls_vbak TYPE ty_vbak.          "Estrutura - Estrutura - Documento de Vendas: Dados de Cabeçalho
+  DATA: t_vbak  TYPE TABLE OF ty_vbak WITH HEADER LINE , "Tabela Interna - Estrutura - Documento de Vendas: Dados de Cabeçalho
+        ls_vbak TYPE ty_vbak.                            "Estrutura - Estrutura - Documento de Vendas: Dados de Cabeçalho
 
   "-----------------------
 
@@ -113,17 +113,64 @@ SELECTION-SCREEN SKIP 1.
     name1 TYPE kna1-name1,   "Nome do Cliente -                              [Mestre de Clientes (Parte Geral)]
     maktx TYPE makt-maktx,   "Texto Breve de Material -                      [Textos Breves de Material]
     gtext TYPE tgsbt-gtext,  "Denominação da Divisão -                       [Denominação das Divisões da Empresa]
+    kunnr_name1 TYPE string, "Emissor da Ordem + Nome do Cliente
+    gsber_gtext TYPE string, "Divisão + Denominação da Divisão
+    matnr_maktx TYPE string, "Número do Material + Texto Breve de Material
+    status TYPE c length 1,  "Status do Semáforo
   END OF ty_output.
 
-  DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Estrutura - Tabela de Saída
-        ls_output TYPE ty_output.          "Estrutura - Estrutura - Tabela de Saída
+  DATA: t_output  TYPE TABLE OF ty_output WITH HEADER LINE, "Tabela Interna - Estrutura - Tabela de Saída
+        ls_output TYPE ty_output.                           "Estrutura - Estrutura - Tabela de Saída
 
   "-----------------------
 
+  "------------------------------------------------
+
+  "Escopo do ALV - Estrutura - Tabela Interna
+  DATA: it_fieldcat      TYPE slis_t_fieldcat_alv,
+        wa_fieldcat      TYPE slis_fieldcat_alv.
+
+  "------------------------------------------------
+
+  "Título do ALV
+  DATA: lv_datenow    TYPE char10,   "Data Atual
+        lv_hour       TYPE sy-uzeit, "Hora Atual
+        lv_hour_str   TYPE string,   "Hora
+        lv_minute_str TYPE string,   "Minuto
+        lv_second_str TYPE string,   "Segundo
+        lv_title      TYPE string,   "Título
+        lv_supertitle TYPE char70.   "Título Concatenado
+
+  DATA: lv_time_str TYPE string. "String para receber strings de tempo concatenadas
+
+  lv_title = 'Relatório de Ordens de Venda em Moeda EURO'.
+  lv_hour = sy-uzeit. "Variável recebe hora atual no sistema.
+
+  " Separação da hora, minuto e segundo
+  lv_hour_str   = lv_hour+0(2).
+  lv_minute_str = lv_hour+2(2).
+  lv_second_str = lv_hour+4(2).
+
+  "Concatenando-os com ":" para formar o horário completo
+  CONCATENATE lv_hour_str ':' lv_minute_str ':' lv_second_str INTO lv_time_str.
+
+  "Função para formatar a data
+  CALL FUNCTION 'CONVERT_DATE_TO_EXTERNAL'
+    EXPORTING
+      date_internal = sy-datum
+    IMPORTING
+      date_external = lv_datenow.
+
+  "Juntando o título, a data e a hora
+  CONCATENATE lv_title lv_datenow lv_time_str INTO lv_supertitle SEPARATED BY ' / '.
+
+"------------------------------------------------
+
 "-------------------------------------------------------------------------------------------------------------------"
 "-------------------------------------------------------------------------------------------------------------------"
 "-------------------------------------------------------------------------------------------------------------------"
 
+"Subrotinas
 START-OF-SELECTION.
   PERFORM get_sales_doc.
   PERFORM get_data_item.
@@ -132,6 +179,7 @@ START-OF-SELECTION.
   PERFORM get_text_item.
   PERFORM get_division_text.
   PERFORM data_processing.
+  PERFORM display_data.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -336,25 +384,307 @@ FORM data_processing .
 
 *Dar um loop na tabela interna T_VBAP.
 
-  loop at t_vbap into ls_vbap.
-    
-*  Ler a tabela interna T_VBAK, onde T_VBAP-VBELN = T_VBAK-VBELN. 
+  LOOP AT t_vbap INTO ls_vbap.
+
+*  Ler a tabela interna T_VBAK, onde T_VBAP-VBELN = T_VBAK-VBELN.
 *  Se não encontrar o registro, ler o próximo da tabela interna T_VBAP.
-   
-   read table t_vbak into ls_vbak with key vbeln = 
-    
-  endloop.
 
-*Ler a tabela interna T_KNA1, onde T_KNA1-KUNNR = T_VBAK-KUNNR. Se não
-*encontrar o registro, ler o próximo da tabela interna T_VBAP.
-*Ler a tabela interna T_LIPS, onde T_LIPS-VGBEL = T_VBAP-VBELN e T_LIPSVGPOS = T_VBAP-POSNR.
-"Se não encontrar o registro, ler o próximo da tabela interna T_VBAP.
-*Ler a tabela interna T_MAKT, onde T_VBAP-MATNR = T_MAKT-MATNR. Se não
-*encontrar o registro, ler o próximo da tabela interna T_VBAP.
-*Ler a tabela interna T_TGSBT, onde T_TGSBT-GSBER = T_VBAP-GSBER. Se
-*não encontrar o registro, ler o próximo da tabela interna T_VBAP.
-*Montar a tabela interna de saída.
+   READ TABLE t_vbak INTO ls_vbak WITH KEY vbeln = ls_vbap-vbeln.
+    IF sy-subrc = 0.
+*     [Documento de Vendas: Dados de Cabeçalho]
+      ls_output-vbeln = ls_vbak-vbeln. "Documento de Vendas
+      ls_output-erdat = ls_vbak-erdat. "Data de Criação do Registro
+      ls_output-netwr = ls_vbak-netwr. "Valor Líquido da Ordem na Moeda do Documento
 
-  
+      IF ls_output-netwr <= 20000.
+        ls_output-status = icon_led_red.
+      ELSEIF ls_output-netwr <= 40000.
+        ls_output-status = icon_led_yellow.
+      ELSE.
+        ls_output-status = icon_led_green.
+      ENDIF.
 
+      ls_output-kunnr = ls_vbak-kunnr. "Emissor da Ordem
+*     [Documento de Vendas: Dados de Item]
+      ls_output-posnr = ls_vbap-posnr. "Item do Documento de Vendas
+      ls_output-matnr = ls_vbap-matnr. "Número do Material
+      ls_output-gsber = ls_vbap-gsber. "Divisão
+    ENDIF.
+
+*   *Ler a tabela interna T_KNA1, onde T_KNA1-KUNNR = T_VBAK-KUNNR.
+*   *Se não encontrar o registro, ler o próximo da tabela interna T_VBAP.
+
+   READ TABLE t_kna1 INTO ls_kna1 WITH KEY kunnr = ls_vbak-kunnr.
+    IF sy-subrc = 0.
+*      [Mestre de Clientes (Parte Geral)]
+       ls_output-name1 = ls_kna1-name1.
+    ENDIF.
+
+*  *Ler a tabela interna T_LIPS, onde T_LIPS-VGBEL = T_VBAP-VBELN e T_LIPSVGPOS = T_VBAP-POSNR.
+   "Se não encontrar o registro, ler o próximo da tabela interna T_VBAP.
+
+   READ TABLE t_lips INTO ls_lips WITH KEY vgbel = ls_vbap-vbeln
+                                           vgpos = ls_vbap-posnr.
+     IF sy-subrc = 0.
+*      [Documento SD: Fornecimento: Dados de Item]
+       ls_output-vgbel = ls_lips-vgbel.
+       ls_output-vgpos = ls_lips-vgpos.
+     ENDIF.
+
+*   *Ler a tabela interna T_MAKT, onde T_VBAP-MATNR = T_MAKT-MATNR. Se não
+*   *encontrar o registro, ler o próximo da tabela interna T_VBAP.
+
+   READ TABLE t_makt INTO ls_makt WITH KEY matnr = ls_vbap-matnr.
+     IF sy-subrc = 0.
+*      [Textos Breves de Material]
+       ls_output-maktx = ls_makt-maktx.
+     ENDIF.
+
+*   Ler a tabela interna T_TGSBT, onde T_TGSBT-GSBER = T_VBAP-GSBER. Se
+*   não encontrar o registro, ler o próximo da tabela interna T_VBAP.
+
+   READ TABLE t_tgsbt INTO ls_tgsbt WITH KEY gsber = ls_vbap-gsber.
+     IF sy-subrc = 0.
+*      [Denominação das Divisões da Empresa]
+       ls_output-gtext = ls_tgsbt-gtext.
+     ENDIF.
+
+    CONCATENATE ls_output-kunnr ls_output-name1 INTO ls_output-kunnr_name1 SEPARATED BY ' - '.
+    CONCATENATE ls_output-gsber ls_output-gtext INTO ls_output-gsber_gtext SEPARATED BY ' - '.
+    CONCATENATE ls_output-matnr ls_output-maktx INTO ls_output-matnr_maktx SEPARATED BY ' - '.
+
+*    " Determine status for NETWR
+*    IF ls_output-netwr <= 1000.
+*      ls_output-status-color-col = 'C11111'.
+*      ls_output-status-icon = '@1P@'.
+*    ELSEIF ls_output-netwr > 1000 AND ls_output-netwr <= 5000.
+*      ls_output-status-color-col = 'C1A300'.
+*      ls_output-status-icon = '@1E@'.
+*    ELSE.
+*      ls_output-status-color-col = 'C1B9B5'.
+*      ls_output-status-icon = '@1G@'.
+*    ENDIF.
+
+    APPEND ls_output TO t_output.
+  ENDLOOP.
+
+WRITE 'a'.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form display_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM display_data .
+
+*Layout do Relatório:
+*O relatório deverá imprimir os campos conforme regras abaixo:
+*Efetuar quebra pelos campos da tabela de saída ERDAT KUNNR/NAME1 e
+*GSBER/GTEXT. (resultado da concatenação)
+
+*O campo NETWR deverá possuir somatória.
+
+*O campo VBELN(VBAK) deverá possui HOTSPOT conforme parâmetros abaixo:
+*SET PARAMETER ID ‘AUN’ FIELD SELFIELD-VALUE.
+*CALL TRANSACTION ‘VA03’ AND SKIP FIRST SCREEN.
+
+*O campo VBELN(LIPS) deverá possui HOTSPOT conforme parâmetros abaixo:
+*SET PARAMETER ID ‘VL’ FIELD SELFIELD-VALUE.
+*CALL TRANSACTION ‘VL03N’ AND SKIP FIRST SCREEN.
+
+*O campo STATUS deverá ser preenchido com semáforo vermelho se NETWR <=
+*20000, amarelo se NETWR > 20000 e NETWR <= 40000 e verde se NETWR > 40000.
+
+*Criar 2 botões, um para geração do arquivo TXT e outro do arquivo CSV das
+*linhas selecionadas no relatório.
+
+*O cabeçalho do relatório, além do título, deverá ter a data (sy-datum) e a hora (syuzeit) de execução do mesmo
+
+* Configuração do layout
+
+* Definir coloração
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 1.
+  wa_fieldcat-fieldname = 'vbeln'.
+  wa_fieldcat-key = 'X'.
+  wa_fieldcat-hotspot = 'X'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Número do Documento'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 19.
+  wa_fieldcat-ref_tabname = 'VBAK'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 2.
+  wa_fieldcat-fieldname = 'erdat'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Data'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 12.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 3.
+  wa_fieldcat-fieldname = 'posnr'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Doc. Vendas'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 12.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 4.
+  wa_fieldcat-fieldname = 'kunnr_name1'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Cliente'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 24.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 5.
+  wa_fieldcat-fieldname = 'netwr'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Valor Líquido'.
+  wa_fieldcat-do_sum = 'X'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 10.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 6.
+  wa_fieldcat-fieldname = 'matnr_maktx'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Material'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 34.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 7.
+  wa_fieldcat-fieldname = 'vgbel'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Número Documento (LIPS)'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-hotspot = 'X'.
+  wa_fieldcat-outputlen = 10.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 8.
+  wa_fieldcat-fieldname = 'gsber_gtext'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Divisão'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 10.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 9.
+  wa_fieldcat-fieldname = 'status'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Status'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 10.
+  wa_fieldcat-icon = 'X'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+*  * Layout do ALV
+  DATA: wa_layout TYPE slis_layout_alv.
+  wa_layout-colwidth_optimize = 'X'.
+  wa_layout-zebra = 'X'.
+
+*   Botões do ALV
+  DATA: it_excluding TYPE slis_t_extab.
+  APPEND 'PRINT' TO it_excluding.
+  APPEND 'SAVE' TO it_excluding.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+  EXPORTING
+    i_callback_program      = sy-repid
+    i_callback_user_command = 'USER_COMMAND'
+    is_layout               = wa_layout
+    it_fieldcat             = it_fieldcat
+    it_excluding            = it_excluding
+    i_grid_title            = lv_supertitle
+  TABLES
+    t_outtab                = t_output.
+
+ENDFORM.
+FORM user_command USING r_ucomm LIKE sy-ucomm
+                        rs_selfield TYPE slis_selfield.
+
+  CASE r_ucomm.
+    WHEN '&IC1'.
+      READ TABLE t_output INDEX rs_selfield-tabindex INTO ls_output.
+      IF sy-subrc = 0.
+        CASE rs_selfield-fieldname.
+          WHEN 'VBAK'.
+            SET PARAMETER ID 'AUN' FIELD ls_output-vbeln.
+            CALL TRANSACTION 'VA03' AND SKIP FIRST SCREEN.
+          WHEN 'VGBEL'.
+            SET PARAMETER ID 'VL' FIELD ls_output-vgbel.
+            CALL TRANSACTION 'VL03N' AND SKIP FIRST SCREEN.
+        ENDCASE.
+      ENDIF.
+    WHEN 'EXPORT_TXT'.
+      PERFORM export_to_txt.
+    WHEN 'EXPORT_CSV'.
+      PERFORM export_to_csv.
+  ENDCASE.
+
+ENDFORM.
+
+FORM call_transaction USING p_vbeln TYPE vbak-vbeln.
+
+  DATA: lv_command TYPE string.
+
+  " Monta o comando para a transação SE16N com o número do documento
+  CONCATENATE '/nSE16N' 'VBAK' INTO lv_command SEPARATED BY space.
+
+  " Adiciona o valor do número do documento ao comando
+  SET PARAMETER ID 'AUN' FIELD p_vbeln.
+
+  " Chama a transação SE16N com o comando montado
+  CALL TRANSACTION 'VA03' AND SKIP FIRST SCREEN.
+
+ENDFORM.
+FORM export_to_txt.
+  DATA: lv_filename TYPE string,
+        lv_file TYPE string.
+
+  lv_filename = '/tmp/relatorio.txt'.
+  OPEN DATASET lv_filename FOR OUTPUT IN TEXT MODE ENCODING DEFAULT.
+  LOOP AT t_output INTO ls_output.
+    lv_file = ls_output-erdat && ' ' && ls_output-kunnr && ' ' && ls_output-name1 &&
+              ' ' && ls_output-gsber && ' ' && ls_output-gtext && ' ' &&
+              ls_output-vbeln && ' ' && ls_output-vbeln && ' ' &&
+              ls_output-netwr && ' ' && ls_output-status.
+    TRANSFER lv_file TO lv_filename.
+  ENDLOOP.
+  CLOSE DATASET lv_filename.
+  MESSAGE 'Arquivo TXT exportado com sucesso' TYPE 'I'.
+ENDFORM.
+
+* Função para exportar dados para CSV
+FORM export_to_csv.
+  DATA: lv_filename TYPE string,
+        lv_file TYPE string.
+
+  lv_filename = '/tmp/relatorio.csv'.
+  OPEN DATASET lv_filename FOR OUTPUT IN TEXT MODE ENCODING DEFAULT.
+  LOOP AT t_output INTO ls_output.
+    lv_file = ls_output-erdat && ',' && ls_output-kunnr && ',' && ls_output-name1 &&
+              ',' && ls_output-gsber && ',' && ls_output-gtext && ',' &&
+              ls_output-vbeln && ',' && ls_output-vbeln && ',' &&
+              ls_output-netwr && ',' && ls_output-status.
+    TRANSFER lv_file TO lv_filename.
+  ENDLOOP.
+  CLOSE DATASET lv_filename.
+  MESSAGE 'Arquivo CSV exportado com sucesso' TYPE 'I'.
 ENDFORM.
