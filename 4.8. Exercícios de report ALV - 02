@@ -116,7 +116,7 @@ SELECTION-SCREEN SKIP 1.
     kunnr_name1 TYPE string, "Emissor da Ordem + Nome do Cliente
     gsber_gtext TYPE string, "Divisão + Denominação da Divisão
     matnr_maktx TYPE string, "Número do Material + Texto Breve de Material
-    status TYPE c length 1,  "Status do Semáforo
+    status TYPE icon_d,  "Status do Semáforo
   END OF ty_output.
 
   DATA: t_output  TYPE TABLE OF ty_output WITH HEADER LINE, "Tabela Interna - Estrutura - Tabela de Saída
@@ -478,34 +478,8 @@ ENDFORM.
 *& -->  p1        text
 *& <--  p2        text
 *&---------------------------------------------------------------------*
-FORM display_data .
-
-*Layout do Relatório:
-*O relatório deverá imprimir os campos conforme regras abaixo:
-*Efetuar quebra pelos campos da tabela de saída ERDAT KUNNR/NAME1 e
-*GSBER/GTEXT. (resultado da concatenação)
-
-*O campo NETWR deverá possuir somatória.
-
-*O campo VBELN(VBAK) deverá possui HOTSPOT conforme parâmetros abaixo:
-*SET PARAMETER ID ‘AUN’ FIELD SELFIELD-VALUE.
-*CALL TRANSACTION ‘VA03’ AND SKIP FIRST SCREEN.
-
-*O campo VBELN(LIPS) deverá possui HOTSPOT conforme parâmetros abaixo:
-*SET PARAMETER ID ‘VL’ FIELD SELFIELD-VALUE.
-*CALL TRANSACTION ‘VL03N’ AND SKIP FIRST SCREEN.
-
-*O campo STATUS deverá ser preenchido com semáforo vermelho se NETWR <=
-*20000, amarelo se NETWR > 20000 e NETWR <= 40000 e verde se NETWR > 40000.
-
-*Criar 2 botões, um para geração do arquivo TXT e outro do arquivo CSV das
-*linhas selecionadas no relatório.
-
-*O cabeçalho do relatório, além do título, deverá ter a data (sy-datum) e a hora (syuzeit) de execução do mesmo
-
-* Configuração do layout
-
-* Definir coloração
+FORM build_field_catalog USING pt_fieldcat TYPE slis_t_fieldcat_alv.
+  DATA: ls_fieldcat TYPE slis_fieldcat_alv.
 
   CLEAR wa_fieldcat.
   wa_fieldcat-col_pos = 1.
@@ -590,9 +564,41 @@ FORM display_data .
   wa_fieldcat-tabname = 't_output'.
   wa_fieldcat-seltext_m = 'Status'.
   wa_fieldcat-just = 'C'.
-  wa_fieldcat-outputlen = 10.
+  wa_fieldcat-outputlen = 15.
   wa_fieldcat-icon = 'X'.
   APPEND wa_fieldcat TO it_fieldcat.
+
+ENDFORM.
+FORM display_data .
+
+  PERFORM build_field_catalog USING it_fieldcat.
+
+*Layout do Relatório:
+*O relatório deverá imprimir os campos conforme regras abaixo:
+*Efetuar quebra pelos campos da tabela de saída ERDAT KUNNR/NAME1 e
+*GSBER/GTEXT. (resultado da concatenação)
+
+*O campo NETWR deverá possuir somatória.
+
+*O campo VBELN(VBAK) deverá possui HOTSPOT conforme parâmetros abaixo:
+*SET PARAMETER ID ‘AUN’ FIELD SELFIELD-VALUE.
+*CALL TRANSACTION ‘VA03’ AND SKIP FIRST SCREEN.
+
+*O campo VBELN(LIPS) deverá possui HOTSPOT conforme parâmetros abaixo:
+*SET PARAMETER ID ‘VL’ FIELD SELFIELD-VALUE.
+*CALL TRANSACTION ‘VL03N’ AND SKIP FIRST SCREEN.
+
+*O campo STATUS deverá ser preenchido com semáforo vermelho se NETWR <=
+*20000, amarelo se NETWR > 20000 e NETWR <= 40000 e verde se NETWR > 40000.
+
+*Criar 2 botões, um para geração do arquivo TXT e outro do arquivo CSV das
+*linhas selecionadas no relatório.
+
+*O cabeçalho do relatório, além do título, deverá ter a data (sy-datum) e a hora (syuzeit) de execução do mesmo
+
+* Configuração do layout
+
+* Definir coloração
 
 *  * Layout do ALV
   DATA: wa_layout TYPE slis_layout_alv.
@@ -619,18 +625,30 @@ ENDFORM.
 FORM user_command USING r_ucomm LIKE sy-ucomm
                         rs_selfield TYPE slis_selfield.
 
-  CASE r_ucomm.
-    WHEN '&IC1'.
+*  CASE r_ucomm.
+*    WHEN '&IC1'.
+*      READ TABLE t_output INDEX rs_selfield-tabindex INTO ls_output.
+*      IF sy-subrc = 0.
+*        CASE rs_selfield-fieldname.
+*          WHEN 'VBAK'.
+*            SET PARAMETER ID 'AUN' FIELD ls_output-vbeln.
+*            CALL TRANSACTION 'VA03' AND SKIP FIRST SCREEN.
+*          WHEN 'VGBEL'.
+*            SET PARAMETER ID 'VL' FIELD ls_output-vgbel.
+*            CALL TRANSACTION 'VL03N' AND SKIP FIRST SCREEN.
+*        ENDCASE.
+*      ENDIF.
+*    WHEN 'EXPORT_TXT'.
+*      PERFORM export_to_txt.
+*    WHEN 'EXPORT_CSV'.
+*      PERFORM export_to_csv.
+*  ENDCASE.
+
+CASE r_ucomm.
+    WHEN '&IC1'. " Este é o comando padrão para hotspots
       READ TABLE t_output INDEX rs_selfield-tabindex INTO ls_output.
       IF sy-subrc = 0.
-        CASE rs_selfield-fieldname.
-          WHEN 'VBAK'.
-            SET PARAMETER ID 'AUN' FIELD ls_output-vbeln.
-            CALL TRANSACTION 'VA03' AND SKIP FIRST SCREEN.
-          WHEN 'VGBEL'.
-            SET PARAMETER ID 'VL' FIELD ls_output-vgbel.
-            CALL TRANSACTION 'VL03N' AND SKIP FIRST SCREEN.
-        ENDCASE.
+        PERFORM call_transaction USING ls_output-vbeln.
       ENDIF.
     WHEN 'EXPORT_TXT'.
       PERFORM export_to_txt.
