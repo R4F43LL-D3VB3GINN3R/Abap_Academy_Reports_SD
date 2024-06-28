@@ -5,202 +5,103 @@
 *&---------------------------------------------------------------------*
 REPORT zreport_alv_3.
 
-TABLES: vbrk, vbak, vbrp, kna1, makt.
+TABLES: vbrk, "Tabela Transparente - Documento de Faturamento: Dados de Cabeçalho
+        vbak, "Tabela Transparente - Documento de Vendas: Dados de Cabeçalho
+        vbrp, "Tabela Transparente - Documento de Faturamento: Dados de Item
+        kna1, "Tabela Transparente - Mestre de Clientes (Parte Geral)
+        makt. "Tabela Transparente - Textos Breves de Material
+
+DATA: lv_count TYPE i.
+
+TYPES: BEGIN OF ty_vbrk, "Estrutura - Documento de Faturamento: Dados de Cabeçalho
+  vbeln TYPE vbrk-vbeln, "Número Fatura
+  fkdat TYPE vbrk-fkdat, "Data Criação
+  kunrg TYPE vbrk-kunrg, "Pagador
+END OF ty_vbrk.
+
+DATA: t_vbrk  TYPE TABLE OF ty_vbrk, "Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
+      ls_vbrk TYPE ty_vbrk.          "Estrutura - Documento de Faturamento: Dados de Cabeçalho
 
 SELECTION-SCREEN SKIP 1.
 SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
-  SELECT-OPTIONS: s_vbeln FOR vbrk-vbeln,
-                  s_fkdat FOR vbrk-fkdat.
-      PARAMETERS: p_kunrg TYPE vbrk-kunrg.
+  SELECT-OPTIONS: s_vbeln FOR vbrk-vbeln,                     "Número Fatura
+                  s_fkdat FOR vbrk-fkdat.                     "Data Criação
+      PARAMETERS: p_kunrg TYPE vbrk-kunrg DEFAULT 0017100001. "Pagador
 SELECTION-SCREEN END OF BLOCK a1.
 SELECTION-SCREEN SKIP 1.
 
-SELECT vbeln, fkdat, kunrg
-  INTO TABLE @DATA(t_vbrk)
-  FROM vbrk
-  WHERE vbeln IN @s_vbeln
-    AND fkart = 'F2'
-    AND fkdat IN @s_fkdat
-    AND kunrg = @p_kunrg.
-SELECT vbeln, posnr, matnr, fkimg, vrkme, netwr , aubel
-    INTO TABLE @DATA(t_vbrp)
-    FROM vbrp
-    FOR ALL ENTRIES IN @t_vbrk
-    WHERE vbeln = @t_vbrk-vbeln.
-SELECT vbeln
-  INTO TABLE @DATA(t_vbak)
-  FROM vbak
-  FOR ALL ENTRIES IN @t_vbrp
-  WHERE vbeln = @t_vbrp-aubel.
-SELECT kunnr, name1
-  INTO TABLE @DATA(t_kna1)
-  FROM kna1
-  FOR ALL ENTRIES IN @t_vbrk
-  WHERE kunnr = @t_vbrk-kunrg.
-SELECT matnr, maktx
-  INTO TABLE @DATA(t_makt)
-  FROM makt
-  FOR ALL ENTRIES IN @t_vbrp
-  WHERE matnr = @t_vbrp-matnr
-  AND spras = @sy-langu.
+START-OF-SELECTION.
+  PERFORM doc_faturas.
+END-OF-SELECTION.
 
-" Declaração de tipos de tabela de saída
-TYPES: BEGIN OF ty_output,
-         vbeln TYPE vbrk-vbeln,
-         fkdat TYPE vbrk-fkdat,
-         kunrg TYPE vbak-kunnr,
-         posnr TYPE vbrp-posnr,
-         matnr TYPE vbrp-matnr,
-         fkimg TYPE vbrp-fkimg,
-         vrkme TYPE vbrp-vrkme,
-         netwr TYPE vbrp-netwr,
-         aubel TYPE vbrp-aubel,
-         name1 TYPE kna1-name1,
-         maktx TYPE makt-maktx,
-         status TYPE icon_d,  "Status do Semáforo
-       END OF ty_output.
+*&---------------------------------------------------------------------*
+*& Form doc_faturas
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM doc_faturas .
 
-" Preenchimento da tabela de saída
-DATA: ls_output TYPE ty_output,
-      t_output type table of ty_output.
+*Selecionar na tabela VBRK os campos VBELN, FKDAT e KUNRG, onde VBELN
+*IN S_VBELN e FKART = ‘F2’ e FKDAT IN S_FKDAT e KUNRG = P_KUNRG.
+*Armazenar registros na tabela interna T_VBRK.
 
-LOOP AT t_vbrk INTO DATA(ls_vbrk).
-  CLEAR ls_output.
-  ls_output-vbeln = ls_vbrk-vbeln.
-  ls_output-fkdat = ls_vbrk-fkdat.
-  ls_output-kunrg = ls_vbrk-kunrg.
+  SELECT vbeln, "Selecione o Número Fatura
+         fkdat, "Data Criação
+         kunrg  "Pagador
+         FROM vbrk "Da Tabela Transparente - Documento de Faturamento: Dados de Cabeçalho
+         INTO CORRESPONDING FIELDS OF TABLE @t_vbrk "Nos campos correspondentes da Tabela Interna - Documento de Faturamento: Dados de Cabeçalho
+         WHERE vbeln IN @s_vbeln "Onde o Número Fatura está no range de procura.
+         AND fkart = 'F2' "E o Tipo Documento de Faturamento
+         AND fkdat IN @s_fkdat "E a Data Criação é está no range de procura.
+         AND kunrg = @p_kunrg. "E o Pagador for o selecionado pelo User.
 
-  READ TABLE t_kna1 INTO DATA(ls_kna1) WITH KEY kunnr = ls_vbrk-kunrg.
   IF sy-subrc = 0.
-    ls_output-name1 = ls_kna1-name1.
+    lv_count = lines( t_vbrk ). "Conta a quantidade de registros na Tabela.
+    cl_demo_output=>new( 'Documentos de Faturamento' )->write_data( t_vbrk )->write_text( |Total de registros encontrados: { lv_count }| )->display( ).
   ENDIF.
 
-  LOOP AT t_vbrp INTO DATA(ls_vbrp) WHERE vbeln = ls_vbrk-vbeln.
-    CLEAR ls_output.
-    ls_output-vbeln = ls_vbrk-vbeln.
-    ls_output-fkdat = ls_vbrk-fkdat.
-    ls_output-kunrg = ls_vbrk-kunrg.
-    ls_output-posnr = ls_vbrp-posnr.
-    ls_output-matnr = ls_vbrp-matnr.
-    ls_output-fkimg = ls_vbrp-fkimg.
-    ls_output-vrkme = ls_vbrp-vrkme.
-    ls_output-netwr = ls_vbrp-netwr.
-    ls_output-aubel = ls_vbrp-aubel.
+ENDFORM.
 
-    READ TABLE t_makt INTO DATA(ls_makt) WITH KEY matnr = ls_vbrp-matnr.
-    IF sy-subrc = 0.
-      ls_output-maktx = ls_makt-maktx.
-    ENDIF.
-
-    READ TABLE t_vbak INTO DATA(ls_vbak) WITH KEY vbeln = ls_vbrp-aubel.
-    IF sy-subrc = 0.
-      APPEND ls_output TO t_output.
-    ENDIF.
-  ENDLOOP.
-ENDLOOP.
-
-DATA: lt_fieldcat TYPE slis_t_fieldcat_alv,
-      ls_fieldcat TYPE slis_fieldcat_alv,
-      ls_layout   TYPE slis_layout_alv.
-
-* Construção do catálogo de campos
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 1.
-ls_fieldcat-fieldname = 'VBELN'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Número do Documento'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-outputlen = 19.
-ls_fieldcat-ref_tabname = 'VBAK'.
-ls_fieldcat-key = 'X'.
-ls_fieldcat-hotspot = 'X'.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 2.
-ls_fieldcat-fieldname = 'FKDAT'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Data'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-outputlen = 12.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 3.
-ls_fieldcat-fieldname = 'POSNR'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Doc. Vendas'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-outputlen = 12.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 4.
-ls_fieldcat-fieldname = 'KUNNR'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Cliente'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-outputlen = 24.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 5.
-ls_fieldcat-fieldname = 'NETWR'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Valor Líquido'.
-ls_fieldcat-do_sum = 'X'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-outputlen = 10.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 6.
-ls_fieldcat-fieldname = 'MATNR'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Material'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-outputlen = 34.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 7.
-ls_fieldcat-fieldname = 'AUBEL'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Número Documento (LIPS)'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-hotspot = 'X'.
-ls_fieldcat-outputlen = 10.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 8.
-ls_fieldcat-fieldname = 'GSBER_GTEXT'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Divisão'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-outputlen = 10.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-CLEAR ls_fieldcat.
-ls_fieldcat-col_pos = 9.
-ls_fieldcat-fieldname = 'STATUS'.
-ls_fieldcat-tabname = 'T_OUTPUT'.
-ls_fieldcat-seltext_m = 'Status'.
-ls_fieldcat-just = 'C'.
-ls_fieldcat-outputlen = 15.
-ls_fieldcat-icon = 'X'.
-APPEND ls_fieldcat TO lt_fieldcat.
-
-* Configuração do layout da ALV
-ls_layout-colwidth_optimize = 'X'.
-ls_layout-zebra = 'X'.
-ls_layout-info_fieldname = 'STATUS'.
-
-* Exibição dos dados na ALV
-CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
-  EXPORTING
-    i_callback_program = sy-repid
-    it_fieldcat        = lt_fieldcat
-    is_layout          = ls_layout
-  TABLES
-    t_outtab           = t_output.
+*Selecionar na tabela VBRP os campos VBELN, POSNR, MATNR , FKIMG,
+*VRKME, NETWR e AUBEL, relacionados com T_VBRK, onde VBRP-VBELN = T_VBRKVBELN. Armazenar registros na tabela interna T_VBRP.
+*Selecionar na tabela VBAK o campo VBELN, relacionados com T_VBRP, onde
+*VBAK-VBELN = T_VBRP-AUBEL. Armazenar registros na tabela interna T_VBAK.
+*Selecionar na tabela KNA1 os campos KUNNR e NAME1, relacionados com
+*T_VBRK, onde KNA1-KUNNR = T_VBTK-KUNRG. Armazenar registros na tabela interna
+*T_KNA1.
+*Selecionar na tabela MAKT os campos MATNR e MAKTX, relacionados com
+*T_VBRP, onde MAKT-MATNR = T_VBRP-MATNR e SPRAS = SY-LANGU. Armazenar
+*registros na tabela interna T_MAKT.
+*
+*Processamento:
+*Dar um loop na tabela interna T_VBRP.
+*Ler a tabela interna T_VBRK, onde T_VBRP-VBELN = T_VBRK-VBELN. Se não
+*encontrar o registro, ler o próximo da tabela interna T_VBRP.
+*Ler a tabela interna T_VBAK, onde T_VBRP-AUBEL = T_VBAK-VBELN. Se não
+*encontrar o registro, ler o próximo da tabela interna T_VBRP.
+*Ler a tabela interna T_KNA1, onde T_KNA1-KUNNR = T_VBRK-KUNRG. Se não
+*encontrar o registro, ler o próximo da tabela interna T_VBRP.
+*Ler a tabela interna T_MAKT, onde T_VBRP-MATNR = T_MAKT-MATNR. Se não
+*encontrar o registro, ler o próximo da tabela interna T_VBRP.
+*Criar uma tabela Z com os mesmos campos do Layout do relatório.
+*
+*Layout Relatório :
+*O relatório deverá imprimir os campos conforme regras abaixo:
+*Efetuar quebra pelos campos da tabela de saída KUNRG/NAME1 e FKDAT.
+*Os campos FKIMG e NETWR deverão possuir somatória.
+*O campo AUBEL deverá possui HOTSPOT conforme parâmetros abaixo:
+*SET PARAMETER ID ‘AUN’ FIELD SELFIELD-VALUE.
+*CALL TRANSACTION ‘VA03’ AND SKIP FIRST SCREEN.
+*O campo VBELN(VBRK) deverá possui HOTSPOT conforme parâmetros abaixo:
+*SET PARAMETER ID ‘VF’ FIELD SELFIELD-VALUE.
+*CALL TRANSACTION ‘VF03’ AND SKIP FIRST SCREEN.
+*Criar 1 botão para gravar o registro selecionado na tabela Z.
+*O campo status do relatório será um semáforo onde o registro, se inserido com
+*sucesso na tabela Z terá o semáforo verde. Se já existir na tabela Z terá o semáforo
+*vermelho.
+*Pintar de vermelho o campo FKIMG se este < 10. Se maior pintar de Verde.
+*Pintar de vermelho o campo NETWR se este < 1000. Se maior pintar de Verde.
+*O cabeçalho do relatório, além do título, deverá ter a data (sy-datum) e a hora (syuzeit) de execução do mesmo.
