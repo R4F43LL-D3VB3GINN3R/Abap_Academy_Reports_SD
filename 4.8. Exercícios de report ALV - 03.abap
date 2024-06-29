@@ -136,6 +136,7 @@ START-OF-SELECTION.
   PERFORM doc_vendas.
   PERFORM doc_clientes.
   PERFORM doc_materiais.
+  PERFORM doc_alv.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -308,23 +309,6 @@ FORM doc_clientes .
         CLEAR ls_kna1.
       ENDLOOP.
     ENDIF.
-
-    " Remover linhas que tenham qualquer campo vazio
-    LOOP AT t_output INTO ls_output.
-      IF ls_output-vbeln  IS INITIAL OR
-         ls_output-fkdat  IS INITIAL OR
-         ls_output-kunrg  IS INITIAL OR
-         ls_output-posnr  IS INITIAL OR
-         ls_output-matnr  IS INITIAL OR
-         ls_output-fkimg  IS INITIAL OR
-         ls_output-vrkme  IS INITIAL OR
-         ls_output-netwr  IS INITIAL OR
-         ls_output-aubel  IS INITIAL OR
-         ls_output-ernam  IS INITIAL.
-        DELETE t_output INDEX sy-tabix.
-      ENDIF.
-    ENDLOOP.
-
   ENDIF.
 
 ENDFORM.
@@ -373,8 +357,49 @@ FORM doc_materiais .
         ENDLOOP.
       ENDIF.
 
+      " Remover linhas que tenham qualquer campo vazio
+      LOOP AT t_output INTO ls_output.
+        IF ls_output-vbeln  IS INITIAL OR
+           ls_output-fkdat  IS INITIAL OR
+           ls_output-kunrg  IS INITIAL OR
+           ls_output-posnr  IS INITIAL OR
+           ls_output-matnr  IS INITIAL OR
+           ls_output-fkimg  IS INITIAL OR
+           ls_output-vrkme  IS INITIAL OR
+           ls_output-netwr  IS INITIAL OR
+           ls_output-aubel  IS INITIAL OR
+           ls_output-ernam  IS INITIAL.
+          DELETE t_output INDEX sy-tabix.
+        ENDIF.
+      ENDLOOP.
+
       lv_count = lines( t_output ). "Conta a quantidade de registros na Tabela.
       cl_demo_output=>new( 'Documentos de Faturamento' )->write_data( t_output )->write_text( |Total de registros encontrados: { lv_count }| )->display( ).
   ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form doc_alv
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM doc_alv .
+
+  DATA: lo_alv     TYPE REF TO cl_salv_table,
+        lo_columns TYPE REF TO cl_salv_columns_table,
+        lo_column  TYPE REF TO cl_salv_column,
+        lo_aggregate TYPE REF TO cl_salv_aggregation.
+
+  " Criar instância ALV
+  cl_salv_table=>factory(
+    IMPORTING
+      r_salv_table = lo_alv
+    CHANGING
+      t_table      = t_output ).
+
+  lo_alv->display( ).
 
 ENDFORM.
