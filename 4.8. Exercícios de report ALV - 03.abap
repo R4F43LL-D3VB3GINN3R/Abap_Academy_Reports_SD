@@ -66,6 +66,16 @@ TYPES: BEGIN OF ty_kna1, "Estrutura - Mestre de Clientes (Parte Geral)
 
 "-----------------------
 
+TYPES: BEGIN OF ty_makt, "Estrutura - Textos Breves de Material
+  matnr TYPE makt-matnr, "Número do Material
+  maktx TYPE makt-maktx, "Texto Breve de Material
+END OF ty_makt.
+
+DATA: t_makt  TYPE TABLE OF ty_makt, "Tabela Interna - Textos Breves de Material
+      ls_makt TYPE ty_makt.          "Estrutura - Textos Breves de Material
+
+"-----------------------
+
 TYPES: BEGIN OF ty_output,
 
   "Documento de Faturamento: Dados de Cabeçalho
@@ -92,6 +102,10 @@ TYPES: BEGIN OF ty_output,
     kunnr TYPE kna1-kunnr, "Nº Cliente
     name1 TYPE kna1-name1, "Nome 1
 
+  "Textos Breves de Material
+
+    maktx TYPE makt-maktx, "Texto Breve de Material
+
 END OF ty_output.
 
 DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Tabela de Saída
@@ -115,12 +129,13 @@ SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
 SELECTION-SCREEN END OF BLOCK a1.
 SELECTION-SCREEN SKIP 1.
 
-"Subroutines
+"Subrotinas
 START-OF-SELECTION.
   PERFORM doc_faturas.
   PERFORM doc_items.
   PERFORM doc_vendas.
   PERFORM doc_clientes.
+  PERFORM doc_materiais.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -310,9 +325,56 @@ FORM doc_clientes .
       ENDIF.
     ENDLOOP.
 
-    lv_count = lines( t_output ). "Conta a quantidade de registros na Tabela.
-    cl_demo_output=>new( 'Documentos de Faturamento' )->write_data( t_output )->write_text( |Total de registros encontrados: { lv_count }| )->display( ).
+  ENDIF.
 
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form doc_materiais
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM doc_materiais .
+
+*Selecionar na tabela MAKT os campos MATNR e MAKTX, relacionados com
+*T_VBRP, onde MAKT-MATNR = T_VBRP-MATNR e SPRAS = SY-LANGU. Armazenar
+*registros na tabela interna T_MAKT.
+
+*+---------+                     +---------+
+*|  VBRP   |                     |  MAKT   |
+*|---------|                     |---------|
+*| VBELN   |                     | MATNR PK|
+*| POSNR   |                     | SPRAS PK|
+*| MATNR FK|-------------------->| MAKTX   |
+*| FKIMG   |                     +---------+
+*| VRKME   |
+*| NETWR   |
+*| AUBEL   |
+*+---------+
+
+  IF t_vbak IS NOT INITIAL.
+    SELECT matnr,  "Número de Material
+           maktx   "Texto Breve de Material
+      FROM makt    "Textos Breves de Material
+      INTO CORRESPONDING FIELDS OF TABLE @t_makt "Nos campos correspondentes da Tabela Interna - Textos Breves de Material
+      FOR ALL ENTRIES IN @t_vbrp "Relacionado à Tabela Interna - Documento de Faturamento: Dados de Item
+      WHERE matnr = @t_vbrp-matnr "Onde o Número de Material é o mesmo
+      AND spras = @sy-langu. "E o idioma é o esclhido no sistema.
+
+      IF sy-subrc = 0.
+        LOOP AT t_output INTO ls_output.
+          READ TABLE t_makt INTO ls_makt WITH KEY matnr = ls_output-matnr.
+          MOVE-CORRESPONDING ls_makt TO ls_output.
+          MODIFY t_output FROM ls_output.
+          CLEAR ls_output.
+          CLEAR ls_makt.
+        ENDLOOP.
+      ENDIF.
+
+      lv_count = lines( t_output ). "Conta a quantidade de registros na Tabela.
+      cl_demo_output=>new( 'Documentos de Faturamento' )->write_data( t_output )->write_text( |Total de registros encontrados: { lv_count }| )->display( ).
   ENDIF.
 
 ENDFORM.
