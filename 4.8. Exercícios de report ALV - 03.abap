@@ -48,11 +48,21 @@ DATA: t_vbrp  TYPE TABLE OF ty_vbrp, "Tabela Interna - Documento de Faturamento:
 
 TYPES: BEGIN OF ty_vbak, "Estrutura - Documento de Vendas: Dados de Cabeçalho
   vbeln TYPE vbak-vbeln, "Documento de Vendas
-  ernam type vbak-ernam, "Nome do Responsável que Adicionou o Objeto
+  ernam TYPE vbak-ernam, "Nome do Responsável que Adicionou o Objeto
 END OF ty_vbak.
 
 DATA: t_vbak  TYPE TABLE OF ty_vbak, "Tabela Interna - Documento de Vendas: Dados de Cabeçalho
       ls_vbak TYPE ty_vbak.          "Estrutura - Documento de Vendas: Dados de Cabeçalho
+
+"-----------------------
+
+TYPES: BEGIN OF ty_kna1, "Estrutura - Mestre de Clientes (Parte Geral)
+    kunnr TYPE kna1-kunnr, "Nº Cliente
+    name1 TYPE kna1-name1, "Nome 1
+  END OF ty_kna1.
+
+  DATA: t_kna1  TYPE TABLE OF ty_kna1, "Tabela Interna - Mestre de Clientes (Parte Geral)
+        ls_kna1 TYPE ty_kna1.          "Estrutura - Mestre de Clientes (Parte Geral)
 
 "-----------------------
 
@@ -75,7 +85,12 @@ TYPES: BEGIN OF ty_output,
 
   "Documento de Vendas: Dados de Cabeçalho
 
-    ernam TYPE vbak-ernam,
+    ernam TYPE vbak-ernam, "Nome do Responsável que Adicionou o Objeto
+
+  "Mestre de Clientes (Parte Geral)
+
+    kunnr TYPE kna1-kunnr, "Nº Cliente
+    name1 TYPE kna1-name1, "Nome 1
 
 END OF ty_output.
 
@@ -105,6 +120,7 @@ START-OF-SELECTION.
   PERFORM doc_faturas.
   PERFORM doc_items.
   PERFORM doc_vendas.
+  PERFORM doc_clientes.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -219,7 +235,7 @@ FORM doc_vendas .
 
   IF t_vbrp IS NOT INITIAL.
     SELECT vbeln,    "Selecione o Número Fatura
-           ernam     "Nome do Cliente
+           ernam     "Nome do User
            FROM vbak "Da Tabela Transparente - Documento de Vendas: Dados de Cabeçalho
            INTO CORRESPONDING FIELDS OF TABLE @t_vbak "Nos campos correspondentes da Tabela Interna - Documento de Vendas: Dados de Cabeçalho
            FOR ALL ENTRIES IN @t_vbrp "Relacionada à Tabela Interna - Documento de Faturamento: Dados de Item
@@ -234,6 +250,47 @@ FORM doc_vendas .
             CLEAR ls_output.
             CLEAR ls_vbak.
         ENDLOOP.
+      ENDLOOP.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form doc_clientes
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM doc_clientes .
+
+*Selecionar na tabela KNA1 os campos KUNNR e NAME1, relacionados com
+*T_VBRK, onde KNA1-KUNNR = T_VBTK-KUNRG. Armazenar registros na tabela interna T_KNA1.
+
+*+---------+                      +---------+
+*|  VBRK   |                      |  KNA1   |
+*|---------|                      |---------|
+*| VBELN PK|                      | KUNNR PK|
+*| FKDAT   |                      | NAME1   |
+*| KUNRG FK|--------------------->|         |
+*+---------+                      +---------+
+
+  IF t_vbak IS NOT INITIAL.
+    SELECT kunnr,    "Selecione Nº Cliente
+           name1     "Nome 1
+           FROM kna1 "Da Tabela Transparente - Mestre de Clientes (Parte Geral)
+           INTO CORRESPONDING FIELDS OF TABLE @t_kna1 "Nos campos correspondentes da Tabela Interna - Mestre de Clientes (Parte Geral)
+           FOR ALL ENTRIES IN @t_vbrk   "Relacionado à Tabela Interna - Mestre de Clientes (Parte Geral)
+           WHERE kunnr = @t_vbrk-kunrg. "Onde os Números de Clientes são iguais.
+
+    IF sy-subrc = 0.
+      LOOP AT t_output INTO ls_output.
+        READ TABLE t_kna1 INTO ls_kna1 WITH KEY kunnr = ls_output-kunrg.
+        MOVE-CORRESPONDING ls_kna1 TO ls_output.
+        MODIFY t_output FROM ls_output.
+        CLEAR ls_output.
+        CLEAR ls_kna1.
       ENDLOOP.
     ENDIF.
 
