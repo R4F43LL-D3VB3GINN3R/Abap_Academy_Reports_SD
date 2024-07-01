@@ -61,8 +61,8 @@ TYPES: BEGIN OF ty_kna1, "Estrutura - Mestre de Clientes (Parte Geral)
     name1 TYPE kna1-name1, "Nome 1
   END OF ty_kna1.
 
-  DATA: t_kna1  TYPE TABLE OF ty_kna1, "Tabela Interna - Mestre de Clientes (Parte Geral)
-        ls_kna1 TYPE ty_kna1.          "Estrutura - Mestre de Clientes (Parte Geral)
+DATA: t_kna1  TYPE TABLE OF ty_kna1, "Tabela Interna - Mestre de Clientes (Parte Geral)
+      ls_kna1 TYPE ty_kna1.          "Estrutura - Mestre de Clientes (Parte Geral)
 
 "-----------------------
 
@@ -77,6 +77,10 @@ DATA: t_makt  TYPE TABLE OF ty_makt, "Tabela Interna - Textos Breves de Material
 "-----------------------
 
 TYPES: BEGIN OF ty_output,
+
+  "Icon
+
+    status TYPE icon_d,
 
   "Documento de Faturamento: Dados de Cabeçalho
 
@@ -106,10 +110,56 @@ TYPES: BEGIN OF ty_output,
 
     maktx TYPE makt-maktx, "Texto Breve de Material
 
+  "Campos Concatenados
+
+    kunrg_name1 TYPE string, "Pagador + Nome 1
+    matnr_maktx TYPE string, "Número do Material + Texto Breve de Material
+
 END OF ty_output.
 
 DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Tabela de Saída
-      ls_output TYPE ty_output.          "Estrutura - Tabela de Saída
+      ls_output TYPE ty_output,          "Estrutura - Tabela de Saída
+      wa_output TYPE ty_output.          "Estrutura - Tabela de Saída
+
+"-----------------------
+
+"Título do ALV
+DATA: lv_datenow    TYPE char10,   "Data Atual
+      lv_hour       TYPE sy-uzeit, "Hora Atual
+      lv_hour_str   TYPE string,   "Hora
+      lv_minute_str TYPE string,   "Minuto
+      lv_second_str TYPE string,   "Segundo
+      lv_title      TYPE string,   "Título
+      lv_supertitle TYPE char70.   "Título Concatenado
+
+DATA: lv_time_str TYPE string. "String para receber strings de tempo concatenadas
+
+lv_title = '‘Relatório de Faturas por Pagador'.
+lv_hour = sy-uzeit. "Variável recebe hora atual no sistema.
+
+" Separação da hora, minuto e segundo
+lv_hour_str   = lv_hour+0(2).
+lv_minute_str = lv_hour+2(2).
+lv_second_str = lv_hour+4(2).
+
+"Concatenando-os com ":" para formar o horário completo
+CONCATENATE lv_hour_str ':' lv_minute_str ':' lv_second_str INTO lv_time_str.
+
+"Função para formatar a data
+CALL FUNCTION 'CONVERT_DATE_TO_EXTERNAL'
+  EXPORTING
+    date_internal = sy-datum
+  IMPORTING
+    date_external = lv_datenow.
+
+"Juntando o título, a data e a hora
+CONCATENATE lv_title lv_datenow lv_time_str INTO lv_supertitle SEPARATED BY ' / '.
+
+"-----------------------
+
+"Escopo do ALV - Estrutura - Tabela Interna
+DATA: it_fieldcat      TYPE slis_t_fieldcat_alv,
+      wa_fieldcat      TYPE slis_fieldcat_alv.
 
 "-----------------------
 
@@ -127,7 +177,6 @@ SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE TEXT-001.
                   s_fkdat FOR vbrk-fkdat.                     "Data Criação
       PARAMETERS: p_kunrg TYPE vbrk-kunrg DEFAULT 0017100001. "Pagador
 SELECTION-SCREEN END OF BLOCK a1.
-SELECTION-SCREEN SKIP 1.
 
 "Subrotinas
 START-OF-SELECTION.
@@ -136,7 +185,8 @@ START-OF-SELECTION.
   PERFORM doc_vendas.
   PERFORM doc_clientes.
   PERFORM doc_materiais.
-  PERFORM doc_alv.
+  PERFORM build_alv.
+  PERFORM display_alv.
 END-OF-SELECTION.
 
 *&---------------------------------------------------------------------*
@@ -207,6 +257,7 @@ FORM doc_items .
       LOOP AT t_vbrk INTO ls_vbrk.
         CLEAR ls_output.
         LOOP AT t_vbrp INTO ls_vbrp WHERE vbeln = ls_vbrk-vbeln.
+          ls_output-status = icon_red_light.
           MOVE-CORRESPONDING ls_vbrk TO ls_output.
           MOVE-CORRESPONDING ls_vbrp TO ls_output.
           APPEND ls_output TO t_output.
@@ -224,7 +275,7 @@ ENDFORM.
 *& -->  p1        text
 *& <--  p2        text
 *&---------------------------------------------------------------------*
-FORM doc_vendas .
+FORM doc_vendas  .
 
 *Selecionar na tabela VBAK o campo VBELN, relacionados com T_VBRP, onde
 *VBAK-VBELN = T_VBRP-AUBEL. Armazenar registros na tabela interna T_VBAK.
@@ -303,10 +354,10 @@ FORM doc_clientes .
     IF sy-subrc = 0.
       LOOP AT t_output INTO ls_output.
         READ TABLE t_kna1 INTO ls_kna1 WITH KEY kunnr = ls_output-kunrg.
-        MOVE-CORRESPONDING ls_kna1 TO ls_output.
-        MODIFY t_output FROM ls_output.
-        CLEAR ls_output.
-        CLEAR ls_kna1.
+          MOVE-CORRESPONDING ls_kna1 TO ls_output.
+          MODIFY t_output FROM ls_output.
+          CLEAR ls_output.
+          CLEAR ls_kna1.
       ENDLOOP.
     ENDIF.
   ENDIF.
@@ -370,36 +421,135 @@ FORM doc_materiais .
            ls_output-aubel  IS INITIAL OR
            ls_output-ernam  IS INITIAL.
           DELETE t_output INDEX sy-tabix.
+        ELSE.
+          CONCATENATE ls_output-kunrg ls_output-name1 INTO ls_output-kunrg_name1 SEPARATED BY ' - '.
+          CONCATENATE ls_output-matnr ls_output-maktx INTO ls_output-matnr_maktx SEPARATED BY ' - '.
+          MODIFY t_output FROM ls_output.
         ENDIF.
       ENDLOOP.
-
-      lv_count = lines( t_output ). "Conta a quantidade de registros na Tabela.
-      cl_demo_output=>new( 'Documentos de Faturamento' )->write_data( t_output )->write_text( |Total de registros encontrados: { lv_count }| )->display( ).
+*      lv_count = lines( t_output ). "Conta a quantidade de registros na Tabela.
+*      cl_demo_output=>new( 'Documentos de Faturamento' )->write_data( t_output )->write_text( |Total de registros encontrados: { lv_count }| )->display( ).
   ENDIF.
 
 ENDFORM.
 *&---------------------------------------------------------------------*
-*& Form doc_alv
+*& Form build_alv
 *&---------------------------------------------------------------------*
 *& text
 *&---------------------------------------------------------------------*
 *& -->  p1        text
 *& <--  p2        text
 *&---------------------------------------------------------------------*
-FORM doc_alv .
+FORM build_alv.
 
-  DATA: lo_alv     TYPE REF TO cl_salv_table,
-        lo_columns TYPE REF TO cl_salv_columns_table,
-        lo_column  TYPE REF TO cl_salv_column,
-        lo_aggregate TYPE REF TO cl_salv_aggregation.
+  sort t_output by fkdat.
 
-  " Criar instância ALV
-  cl_salv_table=>factory(
-    IMPORTING
-      r_salv_table = lo_alv
-    CHANGING
-      t_table      = t_output ).
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 1.
+  wa_fieldcat-fieldname = 'vbeln'.
+  wa_fieldcat-key = 'X'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Número do Documento'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 10.
+  wa_fieldcat-ref_tabname = 'VBAK'.
+  APPEND wa_fieldcat TO it_fieldcat.
 
-  lo_alv->display( ).
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 2.
+  wa_fieldcat-fieldname = 'posnr'.
+  wa_fieldcat-key = 'X'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Item Doc Faturamento'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 8.
+  wa_fieldcat-ref_tabname = 'VBAK'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 3.
+  wa_fieldcat-fieldname = 'fkdat'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Data'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 10.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 4.
+  wa_fieldcat-fieldname = 'kunrg_name1'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Cliente'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 30.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 5.
+  wa_fieldcat-fieldname = 'matnr_maktx'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Material'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 34.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 6.
+  wa_fieldcat-fieldname = 'fkimg'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Faturação'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 8.
+  wa_fieldcat-do_sum = 'X'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 7.
+  wa_fieldcat-fieldname = 'vrkme'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Unidade de Venda'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 12.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 8.
+  wa_fieldcat-fieldname = 'netwr'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Val Líquido'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 12.
+  wa_fieldcat-do_sum = 'X'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 9.
+  wa_fieldcat-fieldname = 'aubel'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Documento de Vendas'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 14.
+  wa_fieldcat-do_sum = 'X'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form display_alv
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM display_alv .
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+  EXPORTING
+    i_callback_program      = sy-repid
+    i_callback_user_command = 'USER_COMMAND'
+    it_fieldcat             = it_fieldcat
+    i_grid_title            = lv_supertitle
+  TABLES
+    t_outtab                = t_output.
 
 ENDFORM.
