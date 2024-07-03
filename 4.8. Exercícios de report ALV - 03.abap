@@ -532,8 +532,16 @@ FORM build_alv.
   wa_fieldcat-seltext_m = 'Documento de Vendas'.
   wa_fieldcat-just = 'C'.
   wa_fieldcat-outputlen = 14.
-  wa_fieldcat-do_sum = 'X'.
   wa_fieldcat-hotspot = abap_true.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  CLEAR wa_fieldcat.
+  wa_fieldcat-col_pos = 10.
+  wa_fieldcat-fieldname = 'status'.
+  wa_fieldcat-tabname = 't_output'.
+  wa_fieldcat-seltext_m = 'Status'.
+  wa_fieldcat-just = 'C'.
+  wa_fieldcat-outputlen = 6.
   APPEND wa_fieldcat TO it_fieldcat.
 
   "Verificação de Quantidade de Campos
@@ -550,10 +558,14 @@ ENDFORM.
 *&---------------------------------------------------------------------*
 FORM display_alv .
 
+  DATA: wa_layout TYPE slis_layout_alv.
+  wa_layout-colwidth_optimize = 'X'.
+  wa_layout-zebra = 'X'.
+
   CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
     EXPORTING
       i_callback_program      = sy-repid
-      is_layout               = layout
+      is_layout               = wa_layout
       i_callback_user_command = 'USER_COMMAND'
       it_fieldcat             = it_fieldcat
       i_grid_title            = lv_supertitle
