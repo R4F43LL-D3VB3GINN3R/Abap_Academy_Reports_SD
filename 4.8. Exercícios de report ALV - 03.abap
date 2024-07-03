@@ -119,7 +119,9 @@ END OF ty_output.
 
 DATA: t_output  TYPE TABLE OF ty_output, "Tabela Interna - Tabela de Saída
       ls_output TYPE ty_output,          "Estrutura - Tabela de Saída
-      wa_output TYPE ty_output.          "Estrutura - Tabela de Saída
+      wa_output TYPE ty_output,          "Estrutura - Tabela de Saída
+      layout    TYPE slis_layout_alv. "Layout parameter
+
 
 "-----------------------
 
@@ -134,7 +136,7 @@ DATA: lv_datenow    TYPE char10,   "Data Atual
 
 DATA: lv_time_str TYPE string. "String para receber strings de tempo concatenadas
 
-lv_title = '‘Relatório de Faturas por Pagador'.
+lv_title = 'Relatório de Faturas por Pagador'.
 lv_hour = sy-uzeit. "Variável recebe hora atual no sistema.
 
 " Separação da hora, minuto e segundo
@@ -442,7 +444,7 @@ ENDFORM.
 *&---------------------------------------------------------------------*
 FORM build_alv.
 
-  sort t_output by fkdat.
+  SORT t_output BY fkdat.
 
   CLEAR wa_fieldcat.
   wa_fieldcat-col_pos = 1.
@@ -453,6 +455,7 @@ FORM build_alv.
   wa_fieldcat-just = 'C'.
   wa_fieldcat-outputlen = 10.
   wa_fieldcat-ref_tabname = 'VBAK'.
+  wa_fieldcat-hotspot     = abap_true.
   APPEND wa_fieldcat TO it_fieldcat.
 
   CLEAR wa_fieldcat.
@@ -530,7 +533,11 @@ FORM build_alv.
   wa_fieldcat-just = 'C'.
   wa_fieldcat-outputlen = 14.
   wa_fieldcat-do_sum = 'X'.
+  wa_fieldcat-hotspot = abap_true.
   APPEND wa_fieldcat TO it_fieldcat.
+
+  "Verificação de Quantidade de Campos
+  DESCRIBE TABLE it_fieldcat LINES lv_count.
 
 ENDFORM.
 *&---------------------------------------------------------------------*
@@ -544,12 +551,30 @@ ENDFORM.
 FORM display_alv .
 
   CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
-  EXPORTING
-    i_callback_program      = sy-repid
-    i_callback_user_command = 'USER_COMMAND'
-    it_fieldcat             = it_fieldcat
-    i_grid_title            = lv_supertitle
-  TABLES
-    t_outtab                = t_output.
+    EXPORTING
+      i_callback_program      = sy-repid
+      is_layout               = layout
+      i_callback_user_command = 'USER_COMMAND'
+      it_fieldcat             = it_fieldcat
+      i_grid_title            = lv_supertitle
+    TABLES
+      t_outtab                = t_output.
+
+ENDFORM.
+FORM user_command USING r_ucomm LIKE sy-ucomm
+                        rs_selfield TYPE slis_selfield.
+
+  CASE r_ucomm.
+    WHEN '&IC1'.
+      READ TABLE t_output INTO ls_output INDEX rs_selfield-tabindex.
+        CASE rs_selfield-fieldname.
+          WHEN 'VBELN'.
+            SET PARAMETER ID 'AUN' FIELD ls_output-vbeln.
+            CALL TRANSACTION 'VA03' AND SKIP FIRST SCREEN.
+          WHEN 'AUBEL'.
+            SET PARAMETER ID 'VL' FIELD ls_output-aubel.
+            CALL TRANSACTION 'VF03' AND SKIP FIRST SCREEN.
+        ENDCASE.
+  ENDCASE.
 
 ENDFORM.
